@@ -1,15 +1,13 @@
 # **my_pip_lib**
 Pip installable lib
 
-#### Example Badges:
-
+#### Badges:
 [![PyPI version](https://img.shields.io/pypi/v/my_pip_lib.svg)](https://pypi.org/project/my_pip_lib/)
 [![Python versions](https://img.shields.io/pypi/pyversions/my_pip_lib.svg)](https://pypi.org/project/my_pip_lib/)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/unknown-user/my_pip_lib/build.yml?branch=main)](https://github.com/unknown-user/my_pip_lib/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Suke0811/my_pip_lib/build.yml?branch=main)](https://github.com/Suke0811/my_pip_lib/actions)
 [![License](https://img.shields.io/pypi/l/my_pip_lib.svg)](LICENSE)
 
 ---
-
 ## **Installation**
 Choose one of the following methods to install the package:
 
@@ -21,24 +19,24 @@ pip install my_pip_lib
 
 ### **2. Install from GitHub**
 ```bash
-pip install git+https://github.com/unknown-user/<repository-name>.git
+pip install git+https://github.com/Suke0811/<repository-name>.git
 ```
 #### a) Install from a Specific Branch
 To install from a specific branch:
 ```bash
-pip install git+https://github.com/unknown-user/my_pip_lib.git@<branch-name>
+pip install git+https://github.com/Suke0811/my_pip_lib.git@<branch-name>
 ```
 
 #### b) Install from a Specific Commit
 To install from a specific commit:
 ```bash
-pip install git+https://github.com/unknown-user/<repository-name>.git@<commit-hash>
+pip install git+https://github.com/Suke0811/<repository-name>.git@<commit-hash>
 ```
 
 #### Install from a Specific Tag
 To install from a specific tag:
 ```bash
-pip install git+https://github.com/unknown-user/<repository-name>.git@<tag>
+pip install git+https://github.com/Suke0811/<repository-name>.git@<tag>
 ```
 
 ### **3. Install from Local or Submodule Repository**
@@ -62,3 +60,4 @@ pip install -e .
 ```bash
 pip install -e /path/to/setup_py_folder/
 ```
+
