@@ -1,7 +1,7 @@
-PACKAGE_NAME = 'my_pip_lib'
+PACKAGE_NAME = 'template-pip-repo'
 PACKAGE_AUTHOR = 'Yusuke Tanaka'
 PACKAGE_DESCRIPTION = 'Pip installable lib'
-REPOSITORY_NAME = 'my_pip_lib'
+REPOSITORY_NAME = 'template-pip-repo'
 
 
 

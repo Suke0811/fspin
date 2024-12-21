@@ -44,9 +44,10 @@ jobs:
 
       - name: Push changes to a new branch
         run: |
-          git checkout -b update-readme
+          git checkout -b update-readme || git checkout update-readme
+          git pull origin update-readme --rebase || echo "No remote branch to pull"
           git add readme.md
-          git commit -m "Update README with metadata"
+          git commit -m "Update README with metadata" || echo "No changes to commit"
           git push origin update-readme --force-with-lease
 
       - name: Install GitHub CLI
