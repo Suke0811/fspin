@@ -2,6 +2,9 @@
 <PACKAGE_DESCRIPTION>
 
 #### Badges:
+![Build Status](https://github.com/<USERNAME>/<REPOSITORY_NAME>/actions/workflows/<WORKFLOW_FILE>.yml/badge.svg)
+![Workflow Status](https://github.com/<USERNAME>/<REPOSITORY_NAME>/actions/workflows/<WORKFLOW_FILE>.yml/badge.svg)
+![License](https://img.shields.io/github/license/<USERNAME>/<REPOSITORY_NAME>)
 [![Version](https://img.shields.io/badge/version-<PACKAGE_VERSION>-blue.svg)](https://github.com/<USERNAME>/<REPOSITORY_NAME>/releases)
 [![Contributors](https://img.shields.io/github/contributors/<USERNAME>/<REPOSITORY_NAME>.svg)](https://github.com/<USERNAME>/<REPOSITORY_NAME>/graphs/contributors)
 [![Issues](https://img.shields.io/github/issues/<USERNAME>/<REPOSITORY_NAME>.svg)](https://github.com/<USERNAME>/<REPOSITORY_NAME>/issues)
