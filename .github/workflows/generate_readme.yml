@@ -29,10 +29,6 @@ jobs:
         run: |
           pip install setuptools setuptools_scm
 
-      - name: Get GitHub Username
-        id: get-username
-        run: echo "GITHUB_USERNAME=${{ github.repository_owner }}" >> $GITHUB_ENV
-
       - name: Generate README
         env:
           GITHUB_USERNAME: ${{ env.GITHUB_USERNAME }}

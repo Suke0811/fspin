@@ -16,7 +16,7 @@ pip install <PACKAGE_NAME>
 
 ### **2. Install from GitHub**
 ```bash
-pip install git+https://github.com/<USERNAME>/<repository-name>.git
+pip install git+https://github.com/<USERNAME>/<REPOSITORY_NAME>.git
 ```
 #### a) Install from a Specific Branch
 To install from a specific branch:
@@ -27,13 +27,13 @@ pip install git+https://github.com/<USERNAME>/<REPOSITORY_NAME>.git@<branch-name
 #### b) Install from a Specific Commit
 To install from a specific commit:
 ```bash
-pip install git+https://github.com/<USERNAME>/<repository-name>.git@<commit-hash>
+pip install git+https://github.com/<USERNAME>/<REPOSITORY_NAME>.git@<commit-hash>
 ```
 
 #### Install from a Specific Tag
 To install from a specific tag:
 ```bash
-pip install git+https://github.com/<USERNAME>/<repository-name>.git@<tag>
+pip install git+https://github.com/<USERNAME>/<REPOSITORY_NAME>.git@<tag>
 ```
 
 ### **3. Install from Local or Submodule Repository**

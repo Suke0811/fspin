@@ -15,7 +15,8 @@ def generate_readme():
         readme_content = template_file.read()
 
     # Retrieve the GitHub username dynamically from the environment
-    github_username = os.getenv('GITHUB_USERNAME', 'unknown-user')
+    username = os.getenv('GITHUB_REPOSITORY', 'unknown/unknown').split('/')[0]
+    repo_name = os.getenv('GITHUB_REPOSITORY', 'unknown/unknown').split('/')[1]
 
     try:
         package_version =  get_version(root=os.path.dirname(os.path.abspath(__file__)), fallback_version="0.0.0")
@@ -23,12 +24,11 @@ def generate_readme():
         print(f"Error retrieving package version: {e}", file=sys.stderr)
         package_version = "0.0.0"
 
-    # Dictionary of placeholders to replace
     placeholders = {
         '<PACKAGE_NAME>': info.PACKAGE_NAME,
         '<PACKAGE_DESCRIPTION>': info.PACKAGE_DESCRIPTION,
-        '<USERNAME>': github_username,
-        '<REPOSITORY_NAME>': info.REPOSITORY_NAME,
+        '<USERNAME>': username,
+        '<REPOSITORY_NAME>': repo_name,
         '<PACKAGE_VERSION>': package_version,
     }
 
