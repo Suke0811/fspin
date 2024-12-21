@@ -8,7 +8,6 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/<USERNAME>/<REPOSITORY_NAME>/build.yml?branch=main)](https://github.com/<USERNAME>/<REPOSITORY_NAME>/actions)
 [![License](https://img.shields.io/pypi/l/<PACKAGE_NAME>.svg)](LICENSE)
 
-
 ---
 
 ## **Installation**

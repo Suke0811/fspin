@@ -2,8 +2,11 @@ name: Process README Placeholders
 
 on:
   push:
-    tags:
-      - "readme"
+    paths:
+      - "package_info.py"
+      - "setup.py"
+      - ".github/workflows/script/readme.template.md"
+      - ".github/workflows/script/process_readme.py"
 
 jobs:
   generate-readme:
