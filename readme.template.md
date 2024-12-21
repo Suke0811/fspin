@@ -19,7 +19,6 @@ To install the latest stable release from [PyPI](https://pypi.org/):
 pip install <PACKAGE_NAME>
 ````
 
-
 ### **2. Install from GitHub**
 ```bash
 pip install git+https://github.com/<USERNAME>/<repository-name>.git
