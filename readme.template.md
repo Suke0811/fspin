@@ -23,13 +23,13 @@ pip install <PACKAGE_NAME>
 ```bash
 pip install git+https://github.com/<USERNAME>/<repository-name>.git
 ```
-#### Install from a Specific Branch
+#### a) Install from a Specific Branch
 To install from a specific branch:
 ```bash
 pip install git+https://github.com/<USERNAME>/<REPOSITORY_NAME>.git@<branch-name>
 ```
 
-#### Install from a Specific Commit
+#### b) Install from a Specific Commit
 To install from a specific commit:
 ```bash
 pip install git+https://github.com/<USERNAME>/<repository-name>.git@<commit-hash>

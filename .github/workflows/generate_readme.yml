@@ -9,6 +9,9 @@ on:
       - "readme.template.md"
       - "process_readme.py"
 
+permissions:
+  contents: write
+
 jobs:
   generate-readme:
     runs-on: ubuntu-latest
@@ -32,10 +35,17 @@ jobs:
         run: |
           python process_readme.py
 
-      - name: Commit updated README
+      - name: Push changes to a new branch
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add readme.md
-          git commit -m "Update README with metadata" || echo "No changes to commit"
-          git push
+          git checkout -b update-readme
+          git add README.md
+          git commit -m "Update README with metadata"
+          git push origin update-readme
+
+      - name: Create a Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update README with metadata
+          branch: update-readme
+          base: main
