@@ -5,7 +5,6 @@ on:
     paths:
       - "package_info.py"
       - "setup.py"
-      - "readme.md"
       - "readme.template.md"
       - "process_readme.py"
 
@@ -45,9 +44,9 @@ jobs:
       - name: Push changes to a new branch
         run: |
           git checkout -b update-readme || git checkout update-readme
-          git pull origin update-readme --rebase || echo "No remote branch to pull"
-          git add readme.md
+          git add . # Stage all changes
           git commit -m "Update README with metadata" || echo "No changes to commit"
+          git pull origin update-readme --rebase || echo "No remote branch to pull"
           git push origin update-readme --force-with-lease
 
       - name: Install GitHub CLI
