@@ -9,7 +9,6 @@
 [![License](https://img.shields.io/pypi/l/<PACKAGE_NAME>.svg)](LICENSE)
 
 ---
-
 ## **Installation**
 Choose one of the following methods to install the package:
 
