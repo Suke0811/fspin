@@ -47,13 +47,12 @@ jobs:
           git checkout -b update-readme
           git add readme.md
           git commit -m "Update README with metadata"
-          git pull origin update-readme --rebase || echo "No remote branch to pull"
-          git push origin update-readme
+          git push origin update-readme --force-with-lease
 
-      - name: Create a Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: Update README with metadata
-          branch: update-readme
-          base: main
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
+
+      - name: Create Pull Request
+        run: gh pr create -B main -H update-readme --title 'Update README' --body 'This pull request was created by a GitHub Action.'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
