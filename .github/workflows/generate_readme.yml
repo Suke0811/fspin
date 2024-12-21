@@ -5,8 +5,8 @@ on:
     paths:
       - "package_info.py"
       - "setup.py"
-      - ".github/workflows/script/readme.template.md"
-      - ".github/workflows/script/process_readme.py"
+      - "readme.template.md"
+      - "process_readme.py"
 
 jobs:
   generate-readme:
@@ -29,7 +29,7 @@ jobs:
         env:
           GITHUB_USERNAME: ${{ env.GITHUB_USERNAME }}
         run: |
-          python .github/workflows/script/process_readme.py
+          python process_readme.py
 
       - name: Commit updated README
         run: |
