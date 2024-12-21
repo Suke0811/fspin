@@ -1,12 +1,11 @@
-# **my_pip_lib**
+# **template-pip-repo**
 Pip installable lib
 
 #### Badges:
-[![PyPI version](https://img.shields.io/pypi/v/my_pip_lib.svg)](https://pypi.org/project/my_pip_lib/)
-[![Python versions](https://img.shields.io/pypi/pyversions/my_pip_lib.svg)](https://pypi.org/project/my_pip_lib/)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Suke0811/my_pip_lib/build.yml?branch=main)](https://github.com/Suke0811/my_pip_lib/actions)
-[![License](https://img.shields.io/pypi/l/my_pip_lib.svg)](LICENSE)
-
+[![PyPI version](https://img.shields.io/pypi/v/template-pip-repo.svg)](https://pypi.org/project/template-pip-repo/)
+[![Python versions](https://img.shields.io/pypi/pyversions/template-pip-repo.svg)](https://pypi.org/project/template-pip-repo/)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Suke0811/template-pip-repo/build.yml?branch=main)](https://github.com/Suke0811/template-pip-repo/actions)
+[![License](https://img.shields.io/pypi/l/template-pip-repo.svg)](LICENSE)
 ---
 ## **Installation**
 Choose one of the following methods to install the package:
@@ -14,7 +13,7 @@ Choose one of the following methods to install the package:
 ### **1. Install from PyPI**
 To install the latest stable release from [PyPI](https://pypi.org/):
 ```bash
-pip install my_pip_lib
+pip install template-pip-repo
 ````
 
 ### **2. Install from GitHub**
@@ -24,7 +23,7 @@ pip install git+https://github.com/Suke0811/<repository-name>.git
 #### a) Install from a Specific Branch
 To install from a specific branch:
 ```bash
-pip install git+https://github.com/Suke0811/my_pip_lib.git@<branch-name>
+pip install git+https://github.com/Suke0811/template-pip-repo.git@<branch-name>
 ```
 
 #### b) Install from a Specific Commit
