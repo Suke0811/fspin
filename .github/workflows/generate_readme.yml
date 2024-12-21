@@ -5,6 +5,7 @@ on:
     paths:
       - "package_info.py"
       - "setup.py"
+      - "readme.md"
       - "readme.template.md"
       - "process_readme.py"
 
