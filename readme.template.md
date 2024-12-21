@@ -11,10 +11,7 @@
 ---
 
 ## **Installation**
-
 Choose one of the following methods to install the package:
-
----
 
 ### **1. Install from PyPI**
 To install the latest stable release from [PyPI](https://pypi.org/):
@@ -22,7 +19,7 @@ To install the latest stable release from [PyPI](https://pypi.org/):
 pip install <PACKAGE_NAME>
 ````
 
-### 2. Install from GitHub
+### **2. Install from GitHub**
 ```bash
 pip install git+https://github.com/<USERNAME>/<repository-name>.git
 ```
@@ -44,7 +41,7 @@ To install from a specific tag:
 pip install git+https://github.com/<USERNAME>/<repository-name>.git@<tag>
 ```
 
-### 3. Install from Local or Submodule Repository
+### **3. Install from Local or Submodule Repository**
 If you have cloned the repository locally:
 #### a) Install from the current directory:
 
@@ -57,7 +54,7 @@ pip install .
 pip install /path/to/setup_py_folder/
 ```
 
-### 4. Install in Developer Mode
+### **4. Install in Developer Mode**
 #### a) Install from the current directory:
 ```bash
 pip install -e .
