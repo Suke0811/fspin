@@ -33,7 +33,13 @@ jobs:
         env:
           GITHUB_USERNAME: ${{ env.GITHUB_USERNAME }}
         run: |
-          python process_readme.py
+          cd $GITHUB_WORKSPACE
+          python .github/workflows/script/process_readme.py
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Push changes to a new branch
         run: |
