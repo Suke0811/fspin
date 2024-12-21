@@ -2,7 +2,7 @@
 Pip installable lib
 
 ## Latest Version 
-### [![Version](https://img.shields.io/badge/version-0.1.dev1+geaeefae-blue.svg)](https://github.com/Suke0811/template-pip-repo/releases)
+### [![Version](https://img.shields.io/badge/version-0.1.dev1+g7fc2d8b-blue.svg)](https://github.com/Suke0811/template-pip-repo/releases)
 
 ---
 ## **Installation**
@@ -16,7 +16,7 @@ pip install template-pip-repo
 
 ### **2. Install from GitHub**
 ```bash
-pip install git+https://github.com/Suke0811/<repository-name>.git
+pip install git+https://github.com/Suke0811/template-pip-repo.git
 ```
 #### a) Install from a Specific Branch
 To install from a specific branch:
@@ -27,13 +27,13 @@ pip install git+https://github.com/Suke0811/template-pip-repo.git@<branch-name>
 #### b) Install from a Specific Commit
 To install from a specific commit:
 ```bash
-pip install git+https://github.com/Suke0811/<repository-name>.git@<commit-hash>
+pip install git+https://github.com/Suke0811/template-pip-repo.git@<commit-hash>
 ```
 
 #### Install from a Specific Tag
 To install from a specific tag:
 ```bash
-pip install git+https://github.com/Suke0811/<repository-name>.git@<tag>
+pip install git+https://github.com/Suke0811/template-pip-repo.git@<tag>
 ```
 
 ### **3. Install from Local or Submodule Repository**
