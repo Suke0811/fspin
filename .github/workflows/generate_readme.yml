@@ -38,7 +38,7 @@ jobs:
       - name: Push changes to a new branch
         run: |
           git checkout -b update-readme
-          git add README.md
+          git add readme.md
           git commit -m "Update README with metadata"
           git push origin update-readme
 

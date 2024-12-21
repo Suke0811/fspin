@@ -48,7 +48,6 @@ pip install git+https://github.com/unknown-user/<repository-name>.git@<tag>
 If you have cloned the repository locally:
 #### a) Install from the current directory:
 
-
 ```bash
 pip install .
 ```
