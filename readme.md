@@ -2,7 +2,10 @@
 Pip installable lib
 
 #### Badges:
-[![Version](https://img.shields.io/badge/version-0.1.dev1+gef1f02a-blue.svg)](https://github.com/Suke0811/template-pip-repo/releases)
+![Build Status](https://github.com/Suke0811/template-pip-repo/actions/workflows/<WORKFLOW_FILE>.yml/badge.svg)
+![Workflow Status](https://github.com/Suke0811/template-pip-repo/actions/workflows/<WORKFLOW_FILE>.yml/badge.svg)
+![License](https://img.shields.io/github/license/Suke0811/template-pip-repo)
+[![Version](https://img.shields.io/badge/version-0.1.dev1+ge4a0678-blue.svg)](https://github.com/Suke0811/template-pip-repo/releases)
 [![Contributors](https://img.shields.io/github/contributors/Suke0811/template-pip-repo.svg)](https://github.com/Suke0811/template-pip-repo/graphs/contributors)
 [![Issues](https://img.shields.io/github/issues/Suke0811/template-pip-repo.svg)](https://github.com/Suke0811/template-pip-repo/issues)
 [![Pull Requests](https://img.shields.io/github/issues-pr/Suke0811/template-pip-repo.svg)](https://github.com/Suke0811/template-pip-repo/pulls)
