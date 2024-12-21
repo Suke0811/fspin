@@ -2,6 +2,7 @@ import re
 import sys
 import os
 import package_info as info
+from setuptools_scm import get_version
 
 def generate_readme():
     # Paths relative to the script's directory
@@ -22,6 +23,7 @@ def generate_readme():
         '<PACKAGE_DESCRIPTION>': info.PACKAGE_DESCRIPTION,
         '<USERNAME>': github_username,
         '<REPOSITORY_NAME>': info.REPOSITORY_NAME,
+        '<PACKAGE_VERSION>': get_version
     }
 
     # Replace placeholders

@@ -1,0 +1,27 @@
+name: Delete `update-readme` Branch
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  delete-branch:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Delete `update-readme` branch
+        run: |
+          branch="update-readme"
+          if git ls-remote --exit-code --heads origin "$branch"; then
+            echo "Deleting branch $branch"
+            git push origin --delete "$branch"
+          else
+            echo "Branch $branch already deleted"
+          fi
