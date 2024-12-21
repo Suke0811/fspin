@@ -47,7 +47,8 @@ jobs:
           git checkout -b update-readme
           git add readme.md
           git commit -m "Update README with metadata"
-          git push origin update-readme --force-with-lease
+          git pull origin update-readme --rebase || echo "No remote branch to pull"
+          git push origin update-readme
 
       - name: Create a Pull Request
         uses: peter-evans/create-pull-request@v5

@@ -1,8 +1,7 @@
 # **<PACKAGE_NAME>**
 <PACKAGE_DESCRIPTION>
 
-#### Example Badges:
-
+#### Badges:
 [![PyPI version](https://img.shields.io/pypi/v/<PACKAGE_NAME>.svg)](https://pypi.org/project/<PACKAGE_NAME>/)
 [![Python versions](https://img.shields.io/pypi/pyversions/<PACKAGE_NAME>.svg)](https://pypi.org/project/<PACKAGE_NAME>/)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/<USERNAME>/<REPOSITORY_NAME>/build.yml?branch=main)](https://github.com/<USERNAME>/<REPOSITORY_NAME>/actions)
