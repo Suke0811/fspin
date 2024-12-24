@@ -1,7 +1,7 @@
-PACKAGE_NAME = 'template-pip-repo'
+PACKAGE_NAME = 'fspin'
 PACKAGE_AUTHOR = 'Yusuke Tanaka'
-PACKAGE_DESCRIPTION = 'Pip installable lib'
-REPOSITORY_NAME = 'template-pip-repo'
+PACKAGE_DESCRIPTION = 'ROS like rate control through python decorator'
+REPOSITORY_NAME = 'fspin'
 
 
 
