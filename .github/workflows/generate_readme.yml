@@ -1,0 +1,58 @@
+name: Process README Placeholders
+
+on:
+  push:
+    paths:
+      - "package_info.py"
+      - "setup.py"
+      - "readme.template.md"
+      - "process_readme.py"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-readme:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+
+      - name: Install Required Tools
+        run: |
+          pip install setuptools setuptools_scm
+
+      - name: Generate README
+        env:
+          GITHUB_USERNAME: ${{ env.GITHUB_USERNAME }}
+        run: |
+          cd $GITHUB_WORKSPACE
+          python process_readme.py
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Push changes to a new branch
+        run: |
+          git checkout -b update-readme || git checkout update-readme
+          git add readme.md 
+          git commit -m "Update README with metadata" || echo "No changes to commit"
+          git pull origin update-readme --rebase || echo "No remote branch to pull"
+          git push origin update-readme --force-with-lease
+
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
+
+      - name: Create Pull Request
+        run: gh pr create -B main -H update-readme --title 'Update README' --body 'This pull request was created by a GitHub Action.'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
