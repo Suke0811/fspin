@@ -3,10 +3,10 @@ name: Process README Placeholders
 on:
   push:
     paths:
-      - "package_info.py"
       - "setup.py"
-      - "readme.template.md"
-      - "process_readme.py"
+      - "setup/package_info.py"
+      - "setup/readme.template.md"
+      - "setup/process_readme.py"
 
 permissions:
   contents: write
@@ -34,7 +34,7 @@ jobs:
           GITHUB_USERNAME: ${{ env.GITHUB_USERNAME }}
         run: |
           cd $GITHUB_WORKSPACE
-          python process_readme.py
+          python setup/process_readme.py
 
       - name: Configure Git User
         run: |
@@ -53,6 +53,6 @@ jobs:
         run: sudo apt-get install -y gh
 
       - name: Create Pull Request
-        run: gh pr create -B main -H update-readme --title 'Update README' --body 'This pull request was created by a GitHub Action.'
+        run: gh pr create -B "$TARGET_BRANCH" -H update-readme --title 'Update README' --body 'This pull request was created by a GitHub Action.'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -8,7 +8,7 @@ def generate_readme():
     # Paths relative to the script's directory
     script_dir = os.path.dirname(__file__)
     template_path = os.path.join(script_dir, "readme.template.md")
-    output_path = os.path.join(script_dir, "readme.md")
+    output_path = os.path.join(script_dir, "../readme.md")
 
     # Load the template file
     with open(template_path, 'r') as template_file:
