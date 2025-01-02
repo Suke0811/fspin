@@ -2,7 +2,7 @@
 Pip installable lib
 
 ## Latest Version 
-### [![Version](https://img.shields.io/badge/version-0.1.dev1+g7fc2d8b-blue.svg)](https://github.com/Suke0811/template-pip-repo/releases)
+### [![Version](https://img.shields.io/badge/version-0.0.0-blue.svg)](https://github.com/Suke0811/template-pip-repo/releases)
 
 ---
 ## **Installation**
