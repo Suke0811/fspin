@@ -53,6 +53,6 @@ jobs:
         run: sudo apt-get install -y gh
 
       - name: Create Pull Request
-        run: gh pr create -B "$TARGET_BRANCH" -H update-readme --title 'Update README' --body 'This pull request was created by a GitHub Action.'
+        run: gh pr create -B "$TARGET_BRANCH" -H update-readme-"$TARGET_BRANCH" --title 'Update README' --body 'This pull request was created by a GitHub Action.'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
