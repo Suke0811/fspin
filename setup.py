@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import codecs
 import os
-from package_info import PACKAGE_NAME, PACKAGE_AUTHOR, PACKAGE_DESCRIPTION, PYTHON_REQUIRES, CLASSIFIERS, SETUP_REQUIRES
+from setup.package_info import PACKAGE_NAME, PACKAGE_AUTHOR, PACKAGE_DESCRIPTION, PYTHON_REQUIRES, CLASSIFIERS, SETUP_REQUIRES
 
 def read(rel_path):
     here = os.path.abspath(os.path.dirname(__file__))
