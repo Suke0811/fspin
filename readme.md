@@ -2,7 +2,7 @@
 Pip installable lib
 
 ## Latest Version 
-### [![Version](https://img.shields.io/badge/version-0.0.0-blue.svg)](https://github.com/Suke0811/template-pip-repo/releases)
+### [![Version](https://img.shields.io/badge/version-0.0.0-blue.svg)](https://github.com/Suke0811/fspin/releases)
 
 ---
 ## **Installation**
@@ -16,24 +16,24 @@ pip install template-pip-repo
 
 ### **2. Install from GitHub**
 ```bash
-pip install git+https://github.com/Suke0811/template-pip-repo.git
+pip install git+https://github.com/Suke0811/fspin.git
 ```
 #### a) Install from a Specific Branch
 To install from a specific branch:
 ```bash
-pip install git+https://github.com/Suke0811/template-pip-repo.git@<branch-name>
+pip install git+https://github.com/Suke0811/fspin.git@<branch-name>
 ```
 
 #### b) Install from a Specific Commit
 To install from a specific commit:
 ```bash
-pip install git+https://github.com/Suke0811/template-pip-repo.git@<commit-hash>
+pip install git+https://github.com/Suke0811/fspin.git@<commit-hash>
 ```
 
 #### Install from a Specific Tag
 To install from a specific tag:
 ```bash
-pip install git+https://github.com/Suke0811/template-pip-repo.git@<tag>
+pip install git+https://github.com/Suke0811/fspin.git@<tag>
 ```
 
 ### **3. Install from Local or Submodule Repository**
@@ -57,3 +57,4 @@ pip install -e .
 ```bash
 pip install -e /path/to/setup_py_folder/
 ```
+
