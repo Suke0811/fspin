@@ -16,12 +16,19 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
+      - name: Extract Head Branch Name
+        id: extract_branch
+        run: |
+          branch_name="${{ github.event.pull_request.head.ref }}"
+          echo "Branch to delete: $branch_name"
+          echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
+
       - name: Delete `update-readme` branch
         run: |
-          branch="update-readme"
+          branch="${BRANCH_NAME}"
           if git ls-remote --exit-code --heads origin "$branch"; then
             echo "Deleting branch $branch"
             git push origin --delete "$branch"
           else
-            echo "Branch $branch already deleted"
+            echo "Branch $branch already deleted or does not exist"
           fi

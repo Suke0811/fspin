@@ -4,8 +4,6 @@ import threading
 import asyncio
 from functools import wraps
 from statistics import mean, stdev
-
-import numpy as np
 import logging
 
 # Configure logging
@@ -15,32 +13,33 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 def spin(freq, condition_fn=None, report=False, thread=False):
     """
     Decorator to run the decorated function at a specified frequency (Hz).
-    Automatically detects if the function is a coroutine and runs it asynchronously or synchronously.
-    Optionally generates a performance report upon completion.
+    Supports both fixed frequencies and dynamically settable frequencies through callables.
 
-    :param freq: Frequency in Hertz at which to execute the function.
+    :param freq: Frequency in Hertz at which to execute the function, or a callable returning the frequency.
     :param condition_fn: Optional callable that returns True to continue spinning.
-    :param report: If True, generates a performance report at the end.
+    :param report: If True, generates a performance report upon completion.
     :param thread: If False, use a blocking while loop; if True, use a separate thread.
     """
     def decorator(func):
         is_coroutine = asyncio.iscoroutinefunction(func)
-        rc = RateControl(freq, is_coroutine=is_coroutine, report=report, thread=thread)
 
-        if is_coroutine:
-            @wraps(func)
-            async def async_wrapper(*args, **kwargs):
-                await rc.start_spinning(func, condition_fn, *args, **kwargs)
-                return rc  # Return the RateControl instance to allow stopping if needed
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            # Determine whether `freq` is callable or fixed
+            frequency = freq() if callable(freq) else freq
+            rc = RateControl(frequency, is_coroutine=False, report=report, thread=thread)
+            rc.start_spinning(func, condition_fn, *args, **kwargs)
+            return rc  # Return the RateControl instance
 
-            return async_wrapper
-        else:
-            @wraps(func)
-            def sync_wrapper(*args, **kwargs):
-                rc.start_spinning(func, condition_fn, *args, **kwargs)
-                return rc  # Return the RateControl instance to allow stopping if needed
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            # Determine whether `freq` is callable or fixed
+            frequency = freq() if callable(freq) else freq
+            rc = RateControl(frequency, is_coroutine=True, report=report, thread=thread)
+            await rc.start_spinning_async(func, condition_fn, *args, **kwargs)
+            return rc  # Return the RateControl instance
 
-            return sync_wrapper
+        return async_wrapper if is_coroutine else sync_wrapper
 
     return decorator
 
