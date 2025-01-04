@@ -1,4 +1,6 @@
 from setuptools import setup, find_packages
+import sys
+sys.path.append(".")
 import codecs
 import os
 from setup.package_info import PACKAGE_NAME, PACKAGE_AUTHOR, PACKAGE_DESCRIPTION, PYTHON_REQUIRES, CLASSIFIERS, SETUP_REQUIRES
