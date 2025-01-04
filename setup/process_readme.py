@@ -1,6 +1,8 @@
 import re
 import sys
 import os
+import sys
+sys.path.append(".")
 from setup import package_info as info
 from setuptools_scm import get_version
 
