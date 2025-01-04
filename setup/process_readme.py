@@ -1,7 +1,7 @@
 import re
 import sys
 import os
-from . import package_info as info
+from setup import package_info as info
 from setuptools_scm import get_version
 
 def generate_readme():
