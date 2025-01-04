@@ -25,8 +25,9 @@ jobs:
           pip install build setuptools_scm
 
       - name: Get Package Name
-        id: package_info
-        run: echo "PACKAGE_NAME=$(python -c 'from package_info import PACKAGE_NAME; print(PACKAGE_NAME)')" >> $GITHUB_ENV
+        run: |
+          PACKAGE_NAME=$(python -c 'from setup.package_info import PACKAGE_NAME; print(PACKAGE_NAME)' || echo "default-package-name")
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
 
       - name: Build package
         run: python -m build
