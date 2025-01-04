@@ -1,5 +1,5 @@
-# **template-pip-repo**
-Pip installable lib
+# **fspin**
+ROS like rate control through python decorator
 
 ## Latest Version 
 ### [![Version](https://img.shields.io/badge/version-0.0.0-blue.svg)](https://github.com/Suke0811/fspin/releases)
@@ -11,7 +11,7 @@ Choose one of the following methods to install the package:
 ### **1. Install from PyPI**
 To install the latest stable release from [PyPI](https://pypi.org/):
 ```bash
-pip install template-pip-repo
+pip install fspin
 ````
 
 ### **2. Install from GitHub**
