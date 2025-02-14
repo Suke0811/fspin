@@ -32,6 +32,13 @@ jobs:
       - name: Build package
         run: python -m build
 
+      - name: Get wheel file name
+        id: get_wheel
+        run: |
+          WHEEL_FILE=$(ls dist/*.whl)
+          echo "WHEEL_FILE=$WHEEL_FILE" >> $GITHUB_ENV
+          echo "Found wheel: $WHEEL_FILE"
+
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
         with:
@@ -42,6 +49,6 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./dist/*.whl
+          asset_path: ${{ env.WHEEL_FILE }}
           asset_name: "${{ env.PACKAGE_NAME }}-${{ github.event.release.tag_name }}.whl"
           asset_content_type: application/zip
