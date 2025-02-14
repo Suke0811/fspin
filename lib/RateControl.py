@@ -4,87 +4,145 @@ import threading
 import asyncio
 from functools import wraps
 from statistics import mean, stdev
+
+import numpy as np
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
+class ReportLogger:
+    """Holds all logging/reporting related functions and data formatting."""
+    def __init__(self, enabled: bool):
+        self.enabled = enabled
+
+    def output(self, msg: str):
+        if self.enabled:
+            logging.info(msg)
+            # print(msg)
+
+    def create_histogram(self, data, bins=10, bar_width=50):
+        if not data:
+            return "No data to display."
+        data_ms = [d * 1e3 for d in data]  # Convert seconds to ms
+        min_val = min(data_ms)
+        max_val = max(data_ms)
+        bin_size = (max_val - min_val) / bins if bins > 0 else 1
+        bin_edges = [min_val + i * bin_size for i in range(bins + 1)]
+        bin_counts = [0] * bins
+
+        for value in data_ms:
+            for i in range(bins):
+                if bin_edges[i] <= value < bin_edges[i + 1]:
+                    bin_counts[i] += 1
+                    break
+            else:
+                bin_counts[-1] += 1  # Edge case for max value
+
+        max_count = max(bin_counts) if bin_counts else 0
+        histogram_lines = []
+        for i in range(bins):
+            lower = bin_edges[i]
+            upper = bin_edges[i + 1]
+            count = bin_counts[i]
+            bar_length = int((count / max_count) * bar_width) if max_count > 0 else 0
+            bar = '█' * bar_length
+            histogram_lines.append(f"{lower:.3f} - {upper:.3f} ms | {bar} ({count})")
+        return "\n".join(histogram_lines)
+
+    def generate_report(self, freq, loop_duration, initial_duration, total_duration,
+                        total_iterations, avg_frequency, avg_function_duration,
+                        avg_loop_duration, avg_deviation, max_deviation, std_dev_deviation,
+                        deviations):
+        self.output("\n=== RateControl Report ===")
+        self.output(f"Set Frequency                  : {freq} Hz")
+        self.output(f"Set Loop Duration              : {loop_duration * 1e3:.3f} ms")
+        if initial_duration is not None:
+            self.output(f"Initial Function Duration      : {initial_duration * 1e3:.3f} ms")
+        self.output(f"Total Duration                 : {total_duration:.3f} seconds")
+        self.output(f"Total Iterations               : {total_iterations}")
+        self.output(f"Average Frequency              : {avg_frequency:.2f} Hz")
+        self.output(f"Average Function Duration      : {avg_function_duration * 1e3:.3f} ms")
+        self.output(f"Average Loop Duration          : {avg_loop_duration * 1e3:.3f} ms")
+        self.output(f"Average Deviation from Desired : {avg_deviation * 1e3:.3f} ms")
+        self.output(f"Maximum Deviation              : {max_deviation * 1e3:.3f} ms")
+        self.output(f"Std Dev of Deviations          : {std_dev_deviation * 1e3:.3f} ms")
+        self.output("\nDistribution of Deviation from Desired Loop Duration (ms):")
+        self.output(self.create_histogram(deviations))
+        self.output("===========================\n")
+
+
 def spin(freq, condition_fn=None, report=False, thread=False):
     """
     Decorator to run the decorated function at a specified frequency (Hz).
-    Supports both fixed frequencies and dynamically settable frequencies through callables.
-
-    :param freq: Frequency in Hertz at which to execute the function, or a callable returning the frequency.
-    :param condition_fn: Optional callable that returns True to continue spinning.
-    :param report: If True, generates a performance report upon completion.
-    :param thread: If False, use a blocking while loop; if True, use a separate thread.
+    Automatically detects if the function is a coroutine and runs it accordingly.
+    Optionally generates a performance report upon completion if report is True.
     """
     def decorator(func):
         is_coroutine = asyncio.iscoroutinefunction(func)
-
-        @wraps(func)
-        def sync_wrapper(*args, **kwargs):
-            # Determine whether `freq` is callable or fixed
-            frequency = freq() if callable(freq) else freq
-            rc = RateControl(frequency, is_coroutine=False, report=report, thread=thread)
-            rc.start_spinning(func, condition_fn, *args, **kwargs)
-            return rc  # Return the RateControl instance
-
-        @wraps(func)
-        async def async_wrapper(*args, **kwargs):
-            # Determine whether `freq` is callable or fixed
-            frequency = freq() if callable(freq) else freq
-            rc = RateControl(frequency, is_coroutine=True, report=report, thread=thread)
-            await rc.start_spinning_async(func, condition_fn, *args, **kwargs)
-            return rc  # Return the RateControl instance
-
-        return async_wrapper if is_coroutine else sync_wrapper
-
+        if is_coroutine:
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                rc = RateControl(freq, is_coroutine=True, report=report, thread=thread)
+                await rc.start_spinning(func, condition_fn, *args, **kwargs)
+                return rc
+            return async_wrapper
+        else:
+            @wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                rc = RateControl(freq, is_coroutine=False, report=report, thread=thread)
+                rc.start_spinning(func, condition_fn, *args, **kwargs)
+                return rc
+            return sync_wrapper
     return decorator
 
 
 class RateControl:
     def __init__(self, freq, is_coroutine, report=False, thread=True):
         """
-        Initialize the RateControl.
-
-        :param freq: Frequency in Hertz at which to execute the function.
-        :param is_coroutine: Boolean indicating if the function is a coroutine.
-        :param report: Boolean indicating if performance reporting is enabled.
-        :param thread: Boolean indicating if threading should be used for synchronous functions.
+        Initialize RateControl.
+        :param freq: Frequency in Hz.
+        :param is_coroutine: Whether the target function is a coroutine.
+        :param report: Enables performance reporting if True.
+        :param thread: Use threading for synchronous functions if True.
         """
         self.freq = freq
-        self.loop_duration = 1.0 / freq  # Desired loop duration in seconds
+        self.loop_duration = 1.0 / freq  # Desired loop duration (seconds)
         self.is_coroutine = is_coroutine
         self.report = report
         self.thread = thread
         self.loop_start_time = time.perf_counter()
         self._stop_event = threading.Event() if not is_coroutine else asyncio.Event()
-        self._task = None  # For asyncio
-        self._thread = None  # For threading
+        self._task = None
+        self._thread = None
 
-        # Performance metrics
-        self.iteration_times = []      # Function execution durations (seconds)
-        self.loop_durations = []       # Actual loop durations (seconds)
-        self.deviations = []           # Deviations from desired loop duration (seconds)
-        self.initial_duration = None   # First function execution duration (seconds)
-        self.start_time = None
-        self.end_time = None
+        # Only record performance metrics if reporting is enabled.
+        if self.report:
+            self.iteration_times = []
+            self.loop_durations = []
+            self.deviations = []
+            self.initial_duration = None
+            self.start_time = None
+            self.end_time = None
+        else:
+            self.iteration_times = None
+            self.loop_durations = None
+            self.deviations = None
+            self.initial_duration = None
+            self.start_time = None
+            self.end_time = None
 
-        self.deviation_accumulator = 0.0  # the deviation accumulator
+        # Logger handles all reporting functions.
+        self.logger = ReportLogger(report)
+
+        # Always maintain deviation accumulator for loop compensation.
+        self.deviation_accumulator = 0.0
 
     def spin_sync(self, func, condition_fn, *args, **kwargs):
-        """
-        Synchronous spinning using threading with deviation compensation.
-
-        :param func: The function to execute.
-        :param condition_fn: A callable that returns True to continue spinning.
-        :param args: Positional arguments for the function.
-        :param kwargs: Keyword arguments for the function.
-        """
+        """Synchronous spinning using threading with deviation compensation."""
         if condition_fn is None:
-            condition_fn = lambda: True  # Default to infinite loop
+            condition_fn = lambda: True
 
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
@@ -96,59 +154,40 @@ class RateControl:
                 func(*args, **kwargs)
             except Exception as e:
                 warnings.warn(f"Exception in spinning function: {e}", category=RuntimeWarning)
-
             iteration_end = time.perf_counter()
             function_duration = iteration_end - iteration_start
 
-            if first_iteration:
-                self.initial_duration = function_duration
-                first_iteration = False
-            else:
-                self.iteration_times.append(function_duration)
+            if self.report:
+                if first_iteration:
+                    self.initial_duration = function_duration
+                    first_iteration = False
+                else:
+                    self.iteration_times.append(function_duration)
 
-            # Calculate sleep duration with deviation compensation
             elapsed = time.perf_counter() - loop_start_time
-            sleep_duration = self.loop_duration - elapsed - self.deviation_accumulator
-
-            # Limit sleep_duration to prevent negative or excessively large sleep times
-            sleep_duration = max(min(sleep_duration, self.loop_duration), 0)
-
+            sleep_duration = max(min(self.loop_duration - elapsed - self.deviation_accumulator,
+                                     self.loop_duration), 0)
             if sleep_duration > 0:
                 time.sleep(sleep_duration)
 
             loop_end_time = time.perf_counter()
             total_loop_duration = loop_end_time - loop_start_time
-
-            # Calculate deviation and update accumulator
             deviation = total_loop_duration - self.loop_duration
-            self.deviations.append(deviation)
+            # Always update accumulator for proper loop timing.
             self.deviation_accumulator += deviation
 
-            # Cap the accumulator
-            max_accumulator = self.loop_duration
-            self.deviation_accumulator = max(min(self.deviation_accumulator, max_accumulator), -max_accumulator)
-
-            # Update loop_end_time and calculate total loop duration
-            loop_end_time = time.perf_counter()
-            total_loop_duration = loop_end_time - loop_start_time
-            self.loop_durations.append(total_loop_duration) # Update with total loop duration
+            if self.report:
+                self.deviations.append(deviation)
+                self.loop_durations.append(total_loop_duration)
 
             loop_start_time = time.perf_counter()
-
 
         self.end_time = time.perf_counter()
         if self.report:
             self.generate_report()
 
     async def spin_async(self, func, condition_fn, *args, **kwargs):
-        """
-        Asynchronous spinning using asyncio with deviation compensation.
-
-        :param func: The coroutine function to execute.
-        :param condition_fn: A callable that returns True to continue spinning.
-        :param args: Positional arguments for the coroutine.
-        :param kwargs: Keyword arguments for the coroutine.
-        """
+        """Asynchronous spinning using asyncio with deviation compensation."""
         if condition_fn is None:
             condition_fn = lambda: True  # Default to infinite loop
 
@@ -165,53 +204,40 @@ class RateControl:
             iteration_end = time.perf_counter()
             function_duration = iteration_end - iteration_start
 
-            if first_iteration:
-                self.initial_duration = function_duration
-                first_iteration = False
-            else:
-                self.iteration_times.append(function_duration)
+            if self.report:
+                if first_iteration:
+                    self.initial_duration = function_duration
+                    first_iteration = False
+                else:
+                    self.iteration_times.append(function_duration)
 
-            # Calculate sleep duration with deviation compensation
             elapsed = iteration_end - loop_start_time
-            sleep_duration = self.loop_duration - elapsed - self.deviation_accumulator
-
-            # Limit sleep_duration to prevent negative or excessively large sleep times
-            sleep_duration = max(min(sleep_duration, self.loop_duration), 0)
-
+            sleep_duration = max(min(self.loop_duration - elapsed - self.deviation_accumulator,
+                                     self.loop_duration), 0)
             if sleep_duration > 0:
                 await asyncio.sleep(sleep_duration)
 
             loop_end_time = time.perf_counter()
             total_loop_duration = loop_end_time - loop_start_time
-
-            # Calculate deviation and update accumulator
             deviation = total_loop_duration - self.loop_duration
-            self.deviations.append(deviation)
             self.deviation_accumulator += deviation
 
-            # Cap the accumulator
-            max_accumulator = self.loop_duration
-            self.deviation_accumulator = max(min(self.deviation_accumulator, max_accumulator), -max_accumulator)
-            # Update loop_start_time for next iteration
-            loop_start_time += self.loop_duration
+            if self.report:
+                self.deviations.append(deviation)
+                self.loop_durations.append(total_loop_duration)
 
-            # Record the actual loop duration
-            self.loop_durations.append(total_loop_duration)
+            # Update loop_start_time to the current time for the next iteration
+            loop_start_time = time.perf_counter()
 
         self.end_time = time.perf_counter()
         if self.report:
             self.generate_report()
 
     def start_spinning_sync(self, func, condition_fn, *args, **kwargs):
-        """
-        Starts the spinning process either in a separate thread or blocking mode based on the thread flag.
-
-        :param func: The function to execute.
-        :param condition_fn: A callable that returns True to continue spinning.
-        :return: The thread object or None for blocking mode.
-        """
+        """Starts spinning synchronously, either blocking or in a separate thread."""
         if self.thread:
-            self._thread = threading.Thread(target=self.spin_sync, args=(func, condition_fn) + args, kwargs=kwargs)
+            self._thread = threading.Thread(
+                target=self.spin_sync, args=(func, condition_fn) + args, kwargs=kwargs)
             self._thread.daemon = True
             self._thread.start()
             return self._thread
@@ -219,48 +245,30 @@ class RateControl:
             self.spin_sync(func, condition_fn, *args, **kwargs)
 
     async def start_spinning_async(self, func, condition_fn, *args, **kwargs):
-        """
-        Starts the spinning process as an asyncio Task (asynchronous mode).
-
-        :param func: The coroutine function to execute.
-        :param condition_fn: A callable that returns True to continue spinning.
-        :param args: Positional arguments for the coroutine.
-        :param kwargs: Keyword arguments for the coroutine.
-        :return: The asyncio Task object.
-        """
+        """Starts spinning asynchronously as an asyncio Task."""
         self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
         await self._task
         return self._task
 
     async def start_spinning_async_wrapper(self, func, condition_fn, *args, **kwargs):
-        """
-        Wrapper to ensure that start_spinning_async is properly awaited.
-        """
         await self.start_spinning_async(func, condition_fn, *args, **kwargs)
 
     def start_spinning(self, func, condition_fn, *args, **kwargs):
         """
         Starts the spinning process based on the mode.
-
-        :param func: The function or coroutine function to execute.
-        :param condition_fn: A callable that returns True to continue spinning.
-        :param args: Positional arguments for the function.
-        :param kwargs: Keyword arguments for the function.
-        :return: The thread or asyncio Task object.
+        Raises a TypeError if the function type does not match the mode.
         """
         if self.is_coroutine:
             if not asyncio.iscoroutinefunction(func):
-                raise TypeError("Detected async_mode, but the function is not a coroutine.")
+                raise TypeError("Expected a coroutine function for async mode.")
             return self.start_spinning_async(func, condition_fn, *args, **kwargs)
         else:
             if asyncio.iscoroutinefunction(func):
-                raise TypeError("Detected sync_mode, but the function is a coroutine.")
+                raise TypeError("Expected a regular function for sync mode.")
             return self.start_spinning_sync(func, condition_fn, *args, **kwargs)
 
     def stop_spinning(self):
-        """
-        Signals the spinning loop to stop.
-        """
+        """Signals the spinning loop to stop."""
         self._stop_event.set()
         if self.is_coroutine:
             if self._task:
@@ -270,78 +278,31 @@ class RateControl:
                 self._thread.join()
 
     def generate_report(self):
-        """
-        Generates and prints the performance report, including function execution durations,
-        average loop duration, and deviation histogram.
-        """
-        if not self.iteration_times and self.initial_duration is None:
-            print("No iterations were recorded.")
+        """Aggregates performance data and delegates report generation to the logger."""
+        if not self.report or not self.iteration_times:
+            self.logger.output("No iterations were recorded.")
             return
 
-        total_duration = self.end_time - self.start_time  # In seconds
+        total_duration = self.end_time - self.start_time
         total_iterations = len(self.iteration_times)
-        average_function_duration = mean(self.iteration_times) if self.iteration_times else 0  # seconds
-        average_deviation = mean(self.deviations) if self.deviations else 0  # seconds
-        max_deviation = max(self.deviations) if self.deviations else 0  # seconds
-        std_dev_deviation = stdev(self.deviations) if len(self.deviations) > 1 else 0.0  # seconds
+        avg_function_duration = mean(self.iteration_times) if self.iteration_times else 0
+        avg_deviation = mean(self.deviations) if self.deviations else 0
+        max_deviation = max(self.deviations) if self.deviations else 0
+        std_dev_deviation = stdev(self.deviations) if len(self.deviations) > 1 else 0.0
+        avg_loop_duration = mean(self.loop_durations) if self.loop_durations else 0
+        avg_frequency = 1 / avg_loop_duration if avg_loop_duration > 0 else 0
 
-        average_loop_duration = mean(self.loop_durations) if self.loop_durations else 0  # seconds
-        average_frequency = 1/average_loop_duration if average_loop_duration > 0 else 0  # Hz
-
-        # Generate distribution histogram based on deviations
-        histogram = self.create_histogram(self.deviations)
-
-        print("\n=== RateControl Report ===")
-        print(f"Set Frequency                  : {self.freq} Hz")
-        print(f"Set Loop Duration              : {self.loop_duration * 1e3:.3f} ms")
-        if self.initial_duration is not None:
-            print(f"Initial Function Duration      : {self.initial_duration * 1e3:.3f} ms")
-        print(f"Total Duration                 : {total_duration:.3f} seconds")
-        print(f"Total Iterations               : {total_iterations}")
-        print(f"Average Frequency              : {average_frequency:.2f} Hz")
-        print(f"Average Function Duration      : {average_function_duration * 1e3:.3f} ms")
-        print(f"Average Loop Duration          : {average_loop_duration * 1e3:.3f} ms")
-        print(f"Average Deviation from Desired : {average_deviation * 1e3:.3f} ms")
-        print(f"Maximum Deviation              : {max_deviation * 1e3:.3f} ms")
-        print(f"Std Dev of Deviations          : {std_dev_deviation * 1e3:.3f} ms")
-        print("\nDistribution of Deviation from Desired Loop Duration (ms):")
-        print(histogram)
-        print("===========================\n")
-
-    def create_histogram(self, data, bins=10, bar_width=50):
-        """
-        Creates a textual histogram for the provided data.
-
-        :param data: List of numerical deviation values in seconds.
-        :param bins: Number of bins in the histogram.
-        :param bar_width: Maximum width of the histogram bars.
-        :return: A string representing the histogram.
-        """
-        if not data:
-            return "No data to display."
-        data_ms = [d * 1e3 for d in data]  # Convert to milliseconds
-        min_val = min(data_ms)
-        max_val = max(data_ms)
-        bin_size = (max_val - min_val) / bins if bins > 0 else 1
-        bin_edges = [min_val + i * bin_size for i in range(bins + 1)]
-        bin_counts = [0 for _ in range(bins)]
-
-        for value in data_ms:
-            for i in range(bins):
-                if bin_edges[i] <= value < bin_edges[i + 1]:
-                    bin_counts[i] += 1
-                    break
-            else:
-                bin_counts[-1] += 1  # Edge case for max_val
-
-        max_count = max(bin_counts) if bin_counts else 0
-        histogram_lines = []
-        for i in range(bins):
-            lower = bin_edges[i]
-            upper = bin_edges[i + 1]
-            count = bin_counts[i]
-            bar_length = int((count / max_count) * bar_width) if max_count > 0 else 0
-            bar = '█' * bar_length
-            histogram_lines.append(f"{lower:.3f} - {upper:.3f} ms | {bar} ({count})")
-
-        return "\n".join(histogram_lines)
+        self.logger.generate_report(
+            freq=self.freq,
+            loop_duration=self.loop_duration,
+            initial_duration=self.initial_duration,
+            total_duration=total_duration,
+            total_iterations=total_iterations,
+            avg_frequency=avg_frequency,
+            avg_function_duration=avg_function_duration,
+            avg_loop_duration=avg_loop_duration,
+            avg_deviation=avg_deviation,
+            max_deviation=max_deviation,
+            std_dev_deviation=std_dev_deviation,
+            deviations=self.deviations
+        )

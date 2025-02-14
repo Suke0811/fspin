@@ -1,49 +1,89 @@
-import asyncio, time
-from .RateControl import spin
+import asyncio
+import time
+from RateControl import spin
 
-start_time_sync = None
+# ---------------------------
+# Synchronous Tests
+# ---------------------------
+def test_sync_with_report():
+    start = time.perf_counter()
+    # Run for 3 seconds.
+    condition = lambda: time.perf_counter() - start < 3
 
-def keep_running_sync():
-    # Example condition: run for 5 seconds
-    return time.perf_counter() - start_time_sync < 5
+    @spin(freq=1000, condition_fn=condition, report=True)
+    def work():
+        # Do a minimal operation.
+        time.sleep(0.00005)
 
-@spin(freq=1000, condition_fn=keep_running_sync, report=True)
-def some_function_that_needs_to_run_at_1000Hz():
-    # Perform a minimal operation to ensure measurable function duration
-    time.sleep(0.0009)
-
-
-@spin(freq=500, condition_fn=None, report=True)
-async def some_async_function_that_runs_at_500Hz():
-    # Perform a minimal asynchronous operation
-    await asyncio.sleep(0.001)  # Simulate async work
-
-
-async def run_async_spinning():
-    rc_async = await some_async_function_that_runs_at_500Hz()  # Starts spinning as an asyncio Task
-    try:
-    # Let the asynchronous spinning run for 6 seconds
-        await asyncio.sleep(6)
-    except asyncio.CancelledError:
-        pass
-    finally:
-        rc_async.stop_spinning()
-        print("Async: Spinning stopped.")
+    print("\nRunning test_sync_with_report...")
+    rc = work()  # Starts spinning in a separate thread.
+    # Allow enough time for the spin loop to run.
+    time.sleep(3.2)
+    rc.stop_spinning()
+    print("test_sync_with_report completed.\n")
 
 
+def test_sync_without_report():
+    start = time.perf_counter()
+    condition = lambda: time.perf_counter() - start < 3
+
+    @spin(freq=1000, condition_fn=condition, report=False)
+    def work():
+        time.sleep(0.0005)
+
+    print("\nRunning test_sync_without_report...")
+    rc = work()  # No report will be printed.
+    time.sleep(3.2)
+    rc.stop_spinning()
+    print("test_sync_without_report completed.\n")
+
+
+# ---------------------------
+# Asynchronous Tests
+# ---------------------------
+async def test_async_with_report():
+    start = time.perf_counter()
+    condition = lambda: time.perf_counter() - start < 3
+
+    @spin(freq=50, condition_fn=condition, report=True)
+    async def async_work():
+        # Minimal async operation.
+        await asyncio.sleep(0.001)
+
+    print("\nRunning test_async_with_report...")
+    rc = await async_work()  # Starts spinning as an asyncio Task.
+    await asyncio.sleep(3.2)
+    rc.stop_spinning()
+    print("test_async_with_report completed.\n")
+
+
+async def test_async_without_report():
+    start = time.perf_counter()
+    condition = lambda: time.perf_counter() - start < 3
+
+    @spin(freq=50, condition_fn=condition, report=False)
+    async def async_work():
+        await asyncio.sleep(0.001)
+
+    print("\nRunning test_async_without_report...")
+    rc = await async_work()  # No report will be printed.
+    await asyncio.sleep(3.2)
+    rc.stop_spinning()
+    print("test_async_without_report completed.\n")
+
+
+# ---------------------------
+# Main Test Runner
+# ---------------------------
 def main():
-    global start_time_sync
-    start_time_sync = time.perf_counter()
-    rc_sync = some_function_that_needs_to_run_at_1000Hz()  # Starts spinning in a separate thread
+    print("=== Starting Synchronous Tests ===")
+    test_sync_with_report()
+    test_sync_without_report()
 
-    try:
-        # Run the asynchronous spinning within the asyncio event loop
-        asyncio.run(run_async_spinning())
-    except KeyboardInterrupt:
-        pass
-    finally:
-        rc_sync.stop_spinning()
-        print("Sync: Spinning stopped.")
+    print("=== Starting Asynchronous Tests ===")
+    asyncio.run(test_async_with_report())
+    asyncio.run(test_async_without_report())
+    print("All tests completed.")
 
 
 if __name__ == "__main__":
