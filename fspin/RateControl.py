@@ -148,43 +148,47 @@ class RateControl:
         loop_start_time = self.start_time
         first_iteration = True
 
-        while not self._stop_event.is_set() and condition_fn():
-            iteration_start = time.perf_counter()
-            try:
-                func(*args, **kwargs)
-            except Exception as e:
-                warnings.warn(f"Exception in spinning function: {e}", category=RuntimeWarning)
-            iteration_end = time.perf_counter()
-            function_duration = iteration_end - iteration_start
+        try:
+            while not self._stop_event.is_set() and condition_fn():
+                iteration_start = time.perf_counter()
+                try:
+                    func(*args, **kwargs)
+                except Exception as e:
+                    warnings.warn(f"Exception in spinning function: {e}", category=RuntimeWarning)
+                iteration_end = time.perf_counter()
+                function_duration = iteration_end - iteration_start
 
+                if self.report:
+                    if first_iteration:
+                        self.initial_duration = function_duration
+                        first_iteration = False
+                    else:
+                        self.iteration_times.append(function_duration)
+
+                elapsed = time.perf_counter() - loop_start_time
+                sleep_duration = max(min(self.loop_duration - elapsed - self.deviation_accumulator,
+                                         self.loop_duration), 0)
+                if sleep_duration > 0:
+                    time.sleep(sleep_duration)
+
+                loop_end_time = time.perf_counter()
+                total_loop_duration = loop_end_time - loop_start_time
+                deviation = total_loop_duration - self.loop_duration
+                # Always update accumulator for proper loop timing.
+                self.deviation_accumulator += deviation
+
+                if self.report:
+                    self.deviations.append(deviation)
+                    self.loop_durations.append(total_loop_duration)
+
+                loop_start_time = time.perf_counter()
+        except KeyboardInterrupt:
+            self.logger.output("KeyboardInterrupt received. Stopping spin.")
+            self._stop_event.set()
+        finally:
+            self.end_time = time.perf_counter()
             if self.report:
-                if first_iteration:
-                    self.initial_duration = function_duration
-                    first_iteration = False
-                else:
-                    self.iteration_times.append(function_duration)
-
-            elapsed = time.perf_counter() - loop_start_time
-            sleep_duration = max(min(self.loop_duration - elapsed - self.deviation_accumulator,
-                                     self.loop_duration), 0)
-            if sleep_duration > 0:
-                time.sleep(sleep_duration)
-
-            loop_end_time = time.perf_counter()
-            total_loop_duration = loop_end_time - loop_start_time
-            deviation = total_loop_duration - self.loop_duration
-            # Always update accumulator for proper loop timing.
-            self.deviation_accumulator += deviation
-
-            if self.report:
-                self.deviations.append(deviation)
-                self.loop_durations.append(total_loop_duration)
-
-            loop_start_time = time.perf_counter()
-
-        self.end_time = time.perf_counter()
-        if self.report:
-            self.generate_report()
+                self.generate_report()
 
     async def spin_async(self, func, condition_fn, *args, **kwargs):
         """Asynchronous spinning using asyncio with deviation compensation."""
@@ -195,43 +199,51 @@ class RateControl:
         loop_start_time = self.start_time
         first_iteration = True
 
-        while not self._stop_event.is_set() and condition_fn():
-            iteration_start = time.perf_counter()
-            try:
-                await func(*args, **kwargs)
-            except Exception as e:
-                warnings.warn(f"Exception in spinning coroutine: {e}", category=RuntimeWarning)
-            iteration_end = time.perf_counter()
-            function_duration = iteration_end - iteration_start
+        try:
+            while not self._stop_event.is_set() and condition_fn():
+                iteration_start = time.perf_counter()
+                try:
+                    await func(*args, **kwargs)
+                except Exception as e:
+                    warnings.warn(f"Exception in spinning coroutine: {e}", category=RuntimeWarning)
+                iteration_end = time.perf_counter()
+                function_duration = iteration_end - iteration_start
 
+                if self.report:
+                    if first_iteration:
+                        self.initial_duration = function_duration
+                        first_iteration = False
+                    else:
+                        self.iteration_times.append(function_duration)
+
+                elapsed = iteration_end - loop_start_time
+                sleep_duration = max(min(self.loop_duration - elapsed - self.deviation_accumulator,
+                                         self.loop_duration), 0)
+                if sleep_duration > 0:
+                    await asyncio.sleep(sleep_duration)
+
+                loop_end_time = time.perf_counter()
+                total_loop_duration = loop_end_time - loop_start_time
+                deviation = total_loop_duration - self.loop_duration
+                self.deviation_accumulator += deviation
+
+                if self.report:
+                    self.deviations.append(deviation)
+                    self.loop_durations.append(total_loop_duration)
+
+                # Update loop_start_time to the current time for the next iteration
+                loop_start_time = time.perf_counter()
+        except KeyboardInterrupt:
+            self.logger.output("KeyboardInterrupt received. Stopping spin.")
+            self._stop_event.set()
+        except asyncio.CancelledError:
+            self.logger.output("Spin task cancelled. Generating report before exit.")
+            self._stop_event.set()
+            raise
+        finally:
+            self.end_time = time.perf_counter()
             if self.report:
-                if first_iteration:
-                    self.initial_duration = function_duration
-                    first_iteration = False
-                else:
-                    self.iteration_times.append(function_duration)
-
-            elapsed = iteration_end - loop_start_time
-            sleep_duration = max(min(self.loop_duration - elapsed - self.deviation_accumulator,
-                                     self.loop_duration), 0)
-            if sleep_duration > 0:
-                await asyncio.sleep(sleep_duration)
-
-            loop_end_time = time.perf_counter()
-            total_loop_duration = loop_end_time - loop_start_time
-            deviation = total_loop_duration - self.loop_duration
-            self.deviation_accumulator += deviation
-
-            if self.report:
-                self.deviations.append(deviation)
-                self.loop_durations.append(total_loop_duration)
-
-            # Update loop_start_time to the current time for the next iteration
-            loop_start_time = time.perf_counter()
-
-        self.end_time = time.perf_counter()
-        if self.report:
-            self.generate_report()
+                self.generate_report()
 
     def start_spinning_sync(self, func, condition_fn, *args, **kwargs):
         """Starts spinning synchronously, either blocking or in a separate thread."""
