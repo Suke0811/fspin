@@ -4,6 +4,7 @@ import threading
 import asyncio
 from functools import wraps
 from statistics import mean, stdev
+import traceback
 
 import numpy as np
 import logging
@@ -155,6 +156,7 @@ class RateControl:
             except Exception as e:
                 func_name = getattr(func, "__name__", "<anonymous>")
                 logging.exception("Exception in spinning function '%s'", func_name)
+                traceback.print_exc()
                 warnings.warn(
                     f"Exception in spinning function '{func_name}': {e}",
                     category=RuntimeWarning,
@@ -207,6 +209,7 @@ class RateControl:
             except Exception as e:
                 func_name = getattr(func, "__name__", "<anonymous>")
                 logging.exception("Exception in spinning coroutine '%s'", func_name)
+                traceback.print_exc()
                 warnings.warn(
                     f"Exception in spinning coroutine '{func_name}': {e}",
                     category=RuntimeWarning,

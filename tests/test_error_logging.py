@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from fspin.RateControl import spin
 
 
-def test_exception_logging_and_warning(caplog):
+def test_exception_logging_and_warning(caplog, capsys):
     call_count = 0
 
     def condition():
@@ -23,8 +23,12 @@ def test_exception_logging_and_warning(caplog):
     with caplog.at_level(logging.ERROR):
         with pytest.warns(RuntimeWarning) as record:
             faulty()
+        stderr = capsys.readouterr().err
 
     # Ensure warning contains function name
     assert any("faulty" in str(w.message) for w in record), record
     # Ensure log contains error with function name
     assert any("faulty" in r.getMessage() for r in caplog.records), caplog.text
+    # Stderr should contain the traceback
+    assert "Traceback" in stderr
+    assert "ValueError: boom" in stderr
