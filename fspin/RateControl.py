@@ -153,7 +153,12 @@ class RateControl:
             try:
                 func(*args, **kwargs)
             except Exception as e:
-                warnings.warn(f"Exception in spinning function: {e}", category=RuntimeWarning)
+                func_name = getattr(func, "__name__", "<anonymous>")
+                logging.exception("Exception in spinning function '%s'", func_name)
+                warnings.warn(
+                    f"Exception in spinning function '{func_name}': {e}",
+                    category=RuntimeWarning,
+                )
             iteration_end = time.perf_counter()
             function_duration = iteration_end - iteration_start
 
@@ -200,7 +205,12 @@ class RateControl:
             try:
                 await func(*args, **kwargs)
             except Exception as e:
-                warnings.warn(f"Exception in spinning coroutine: {e}", category=RuntimeWarning)
+                func_name = getattr(func, "__name__", "<anonymous>")
+                logging.exception("Exception in spinning coroutine '%s'", func_name)
+                warnings.warn(
+                    f"Exception in spinning coroutine '{func_name}': {e}",
+                    category=RuntimeWarning,
+                )
             iteration_end = time.perf_counter()
             function_duration = iteration_end - iteration_start
 
