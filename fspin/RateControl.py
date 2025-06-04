@@ -6,7 +6,6 @@ from functools import wraps
 from statistics import mean, stdev
 import traceback
 
-import numpy as np
 import logging
 
 # Configure logging
@@ -114,7 +113,15 @@ class RateControl:
         self.report = report
         self.thread = thread
         self.loop_start_time = time.perf_counter()
-        self._stop_event = threading.Event() if not is_coroutine else asyncio.Event()
+        if is_coroutine:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            self._stop_event = asyncio.Event()
+        else:
+            self._stop_event = threading.Event()
         self._task = None
         self._thread = None
 
