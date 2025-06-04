@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v3
@@ -24,7 +25,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install build setuptools_scm
 
-      - name: Get Package Name
+      - name: Get package name
         run: |
           PACKAGE_NAME=$(python -c 'from setup.package_info import PACKAGE_NAME; print(PACKAGE_NAME)' || echo "default-package-name")
           echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
@@ -39,8 +40,8 @@ jobs:
           echo "WHEEL_FILE=$WHEEL_FILE" >> $GITHUB_ENV
           echo "Found wheel: $WHEEL_FILE"
 
-      - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
@@ -52,3 +53,5 @@ jobs:
           asset_path: ${{ env.WHEEL_FILE }}
           asset_name: "${{ env.PACKAGE_NAME }}-${{ github.event.release.tag_name }}.whl"
           asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
