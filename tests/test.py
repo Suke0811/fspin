@@ -38,6 +38,23 @@ def test_sync_without_report():
     print("test_sync_without_report completed.\n")
 
 
+def test_sync_keyboard_interrupt():
+    """Ensure a report is generated when KeyboardInterrupt occurs."""
+    counter = {"count": 0}
+
+    @spin(freq=1000, condition_fn=lambda: True, report=True, thread=False)
+    def work():
+        counter["count"] += 1
+        if counter["count"] == 5:
+            raise KeyboardInterrupt
+        time.sleep(0.00005)
+
+    print("\nRunning test_sync_keyboard_interrupt...")
+    rc = work()  # Runs in current thread and should handle KeyboardInterrupt
+    assert rc.end_time is not None
+    print("test_sync_keyboard_interrupt completed.\n")
+
+
 # ---------------------------
 # Asynchronous Tests
 # ---------------------------
@@ -72,6 +89,23 @@ async def test_async_without_report():
     print("test_async_without_report completed.\n")
 
 
+async def test_async_keyboard_interrupt():
+    """Ensure a report is generated when KeyboardInterrupt occurs in async mode."""
+    counter = {"count": 0}
+
+    @spin(freq=50, condition_fn=lambda: True, report=True)
+    async def async_work():
+        counter["count"] += 1
+        if counter["count"] == 5:
+            raise KeyboardInterrupt
+        await asyncio.sleep(0.001)
+
+    print("\nRunning test_async_keyboard_interrupt...")
+    rc = await async_work()
+    assert rc.end_time is not None
+    print("test_async_keyboard_interrupt completed.\n")
+
+
 # ---------------------------
 # Main Test Runner
 # ---------------------------
@@ -79,10 +113,12 @@ def main():
     print("=== Starting Synchronous Tests ===")
     test_sync_with_report()
     test_sync_without_report()
+    test_sync_keyboard_interrupt()
 
     print("=== Starting Asynchronous Tests ===")
     asyncio.run(test_async_with_report())
     asyncio.run(test_async_without_report())
+    asyncio.run(test_async_keyboard_interrupt())
     print("All tests completed.")
 
 
