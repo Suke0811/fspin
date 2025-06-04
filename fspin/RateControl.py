@@ -6,7 +6,6 @@ from functools import wraps
 from statistics import mean, stdev
 import traceback
 
-import numpy as np
 import logging
 
 # Configure logging
