@@ -6,6 +6,21 @@ ROS like rate control through python decorator
 
 
 
+## Usage
+
+```python
+from fspin import spin, rate
+
+@spin(freq=10)
+def loop_decorated():
+    pass
+
+rc = rate(freq=10, is_coroutine=False)
+rc.start_spinning(loop_decorated, lambda: False)
+```
+
+See [the examples](example/README.md) for complete synchronous and asynchronous demos.
+
 ## Performance & Accuracy
 
 The RateControl library is designed to maintain a desired loop frequency by compensating for deviations. Here’s a summary of observed performance:
