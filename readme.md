@@ -9,14 +9,20 @@ ROS like rate control through python decorator
 ## Usage
 
 ```python
+import time
 from fspin import spin, rate
 
-@spin(freq=10)
-def loop_decorated():
-    pass
 
-rc = rate(freq=10, is_coroutine=False)
-rc.start_spinning(loop_decorated, lambda: False)
+@spin(freq=1000, report=True)
+def function_to_loop():
+  # things to loop
+  time.sleep(0.0005) # a fake task to take 0.5ms
+
+  
+# call the function
+function_to_loop() # this will be blocking, and start looping
+# it'll automatically catch the keyboard interrupt
+# we have async version too
 ```
 
 See [the examples](example/README.md) for complete synchronous and asynchronous demos.
