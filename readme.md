@@ -2,7 +2,7 @@
 ROS like rate control through python decorator
 
 ## Latest Version 
-### [![Version](https://img.shields.io/badge/version-0.0.0-blue.svg)](https://github.com/Suke0811/fspin/releases)
+### [![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Suke0811/fspin/releases)
 
 
 
