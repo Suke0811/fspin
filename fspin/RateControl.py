@@ -148,21 +148,21 @@ class RateControl:
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
         first_iteration = True
-
-        while not self._stop_event.is_set() and condition_fn():
-            iteration_start = time.perf_counter()
-            try:
-                func(*args, **kwargs)
-            except Exception as e:
-                func_name = getattr(func, "__name__", "<anonymous>")
-                logging.exception("Exception in spinning function '%s'", func_name)
-                traceback.print_exc()
-                warnings.warn(
-                    f"Exception in spinning function '{func_name}': {e}",
-                    category=RuntimeWarning,
-                )
-            iteration_end = time.perf_counter()
-            function_duration = iteration_end - iteration_start
+        try:
+            while not self._stop_event.is_set() and condition_fn():
+                iteration_start = time.perf_counter()
+                try:
+                    func(*args, **kwargs)
+                except Exception as e:
+                    func_name = getattr(func, "__name__", "<anonymous>")
+                    logging.exception("Exception in spinning function '%s'", func_name)
+                    traceback.print_exc()
+                    warnings.warn(
+                        f"Exception in spinning function '{func_name}': {e}",
+                        category=RuntimeWarning,
+                    )
+                iteration_end = time.perf_counter()
+                function_duration = iteration_end - iteration_start
 
                 if self.report:
                     if first_iteration:
@@ -204,21 +204,22 @@ class RateControl:
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
         first_iteration = True
+        try:
 
-        while not self._stop_event.is_set() and condition_fn():
-            iteration_start = time.perf_counter()
-            try:
-                await func(*args, **kwargs)
-            except Exception as e:
-                func_name = getattr(func, "__name__", "<anonymous>")
-                logging.exception("Exception in spinning coroutine '%s'", func_name)
-                traceback.print_exc()
-                warnings.warn(
-                    f"Exception in spinning coroutine '{func_name}': {e}",
-                    category=RuntimeWarning,
-                )
-            iteration_end = time.perf_counter()
-            function_duration = iteration_end - iteration_start
+            while not self._stop_event.is_set() and condition_fn():
+                iteration_start = time.perf_counter()
+                try:
+                    await func(*args, **kwargs)
+                except Exception as e:
+                    func_name = getattr(func, "__name__", "<anonymous>")
+                    logging.exception("Exception in spinning coroutine '%s'", func_name)
+                    traceback.print_exc()
+                    warnings.warn(
+                        f"Exception in spinning coroutine '{func_name}': {e}",
+                        category=RuntimeWarning,
+                    )
+                iteration_end = time.perf_counter()
+                function_duration = iteration_end - iteration_start
 
                 if self.report:
                     if first_iteration:
