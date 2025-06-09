@@ -3,14 +3,14 @@ ROS like rate control through python decorator
 
 ## Latest Version 
 ### [![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Suke0811/fspin/releases)
-
+[![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pepy.tech/projects/fspin)
 
 
 ## Usage
 
 ```python
 import time
-from fspin import spin, rate
+from fspin import spin
 
 
 @spin(freq=1000, report=True)
