@@ -2,7 +2,7 @@
 ROS like rate control through python decorator
 
 ## Latest Version 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Suke0811/fspin/releases), [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pepy.tech/projects/fspin)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Suke0811/fspin/releases), [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
 
 
 ## Usage
@@ -78,7 +78,7 @@ Distribution of Deviation from Desired Loop Duration (ms):
 Choose one of the following methods to install the package:
 
 ### **1. Install from PyPI**
-To install the latest stable release using pip. [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pepy.tech/projects/fspin)
+To install the latest stable release using pip. [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
 ```bash
 pip install fspin
 ````
