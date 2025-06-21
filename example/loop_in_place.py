@@ -1,4 +1,3 @@
-import time
 from fspin import loop  # wherever you defined loop/RateControl
 import time
 

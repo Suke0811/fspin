@@ -2,12 +2,13 @@
 
 This directory contains simple usage examples for **fspin**. Each example demonstrates using `RateControl` either via the `@spin` decorator or by directly creating the class. Both synchronous and asynchronous approaches are shown.
 
-| File | Description |
-| ---- | ----------- |
-| `sync_decorator.py` | Run a synchronous function at a fixed rate using the `@spin` decorator. |
-| `sync_manual.py`    | Use `RateControl` directly with a synchronous function. |
-| `async_decorator.py`| Run an asynchronous coroutine with the decorator. |
-| `async_manual.py`   | Use `RateControl` directly with an async coroutine. |
+| File                 | Description                                                             |
+|----------------------|-------------------------------------------------------------------------|
+| `sync_decorator.py`  | Run a synchronous function at a fixed rate using the `@spin` decorator. |
+| `sync_manual.py`     | Use `rate` directly with a synchronous function.                        |
+| `async_decorator.py` | Run an asynchronous coroutine with the decorator.                       |
+| `async_manual.py`    | Use `rate` directly with an async coroutine.                            |
+| `loop_in_place.py`   | Use context managet `with loop(...):`.                                  |
 
 Run any example with `python <file>` to see the behaviour.
 
