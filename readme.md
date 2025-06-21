@@ -2,11 +2,10 @@
 ROS like rate control through python decorator
 
 ## Latest Version 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/Suke0811/fspin/releases), [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
+[![Version](https://img.shields.io/badge/version-0.2.x-blue.svg)](https://github.com/Suke0811/fspin/releases), [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
 
 
 ## Usage
-
 ```python
 import time
 from fspin import spin
@@ -24,6 +23,42 @@ function_to_loop() # this will be blocking, and start looping
 # we have async version too
 ```
 
+### with Context-Manager
+```python
+import time
+from fspin import loop
+
+def heartbeat():
+    print(f"Heartbeat at {time.strftime('%H:%M:%S')}")
+
+# Runs in background thread at 2Hz, auto-stops on exit, prints report
+with loop(heartbeat, freq=2, report=True, thread=True):
+    time.sleep(5)  # keep the block alive for 5s
+    print("exiting the loop")
+# automatically exit the loop after 5 sec
+print("Loop exited")
+```
+
+### Using Rate Class directly
+```python
+import time
+from fspin import rate
+
+# Create a rate control for a simple function
+rc = rate(freq=10, is_coroutine=False, report=True, thread=True)
+
+# Start spinning your function in background
+rc.start_spinning(lambda: print("Tick"), None)
+
+# Let it run 3 seconds
+time.sleep(3)
+
+# Stop the loop and print report
+rc.stop_spinning()
+```
+
+
+### More Examples
 See [the examples](example/README.md) for complete synchronous and asynchronous demos.
 
 ## Performance & Accuracy

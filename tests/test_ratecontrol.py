@@ -4,7 +4,7 @@ import types
 import logging
 import pytest
 
-from fspin.RateControl import ReportLogger, RateControl, spin
+from fspin.RateControl import ReportLogger, RateControl, spin, loop
 
 
 def test_create_histogram():
@@ -183,3 +183,36 @@ def test_generate_report_no_iterations(caplog):
     with caplog.at_level(logging.INFO):
         rc.generate_report()
     assert any("No iterations were recorded" in r.getMessage() for r in caplog.records)
+
+def test_loop_context_manager_basic_counts():
+    import time
+    calls = []
+
+    def work():
+        # just record a timestamp each iteration
+        calls.append(time.perf_counter())
+
+    # Run at 100 Hz in a background thread for ~50 ms ⇒ ~5 calls
+    with loop(work, freq=100, report=True, thread=True) as lp:
+        time.sleep(0.05)
+
+    # After exit, the loop has been stopped by __exit__
+    assert len(calls) >= 3, "expected at least 3 iterations"
+    assert hasattr(lp, "initial_duration")
+    assert isinstance(lp.iteration_times, list)
+    assert len(lp.iteration_times) >= 2  # we recorded at least 2 full iterations
+
+
+def test_loop_context_manager_with_args_kwargs():
+    calls = []
+
+    def work(x, y=0):
+        calls.append((x, y))
+
+    # Supply both positional and keyword args to your work()
+    with loop(work, freq=1000, report=False, thread=True, x=7, y=8) as lp:
+        time.sleep(0.005)
+
+    # All calls should see the same arguments
+    assert all(c == (7, 8) for c in calls), f"unexpected args: {calls}"
+
