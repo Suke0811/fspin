@@ -5,7 +5,7 @@ import asyncio
 from functools import wraps
 from statistics import mean, stdev
 import traceback
-
+from contextlib import contextmanager
 import logging
 
 # Configure logging
@@ -97,6 +97,16 @@ def spin(freq, condition_fn=None, report=False, thread=False):
             return sync_wrapper
     return decorator
 
+@contextmanager
+def loop(func, freq, condition_fn=None, report=False, thread=True, *args, **kwargs):
+    """support for with format"""
+    rc = RateControl(freq, is_coroutine=asyncio.iscoroutinefunction(func), report=report, thread=thread)
+    rc.start_spinning(func, condition_fn, *args, **kwargs)
+    try:
+        yield rc
+    finally:
+        rc.stop_spinning()
+
 
 class RateControl:
     def __init__(self, freq, is_coroutine, report=False, thread=True):
@@ -141,7 +151,6 @@ class RateControl:
             self.start_time = None
             self.end_time = None
 
-        # Logger handles all reporting functions.
         self.logger = ReportLogger(report)
 
         # Always maintain deviation accumulator for loop compensation.
@@ -212,7 +221,6 @@ class RateControl:
         loop_start_time = self.start_time
         first_iteration = True
         try:
-
             while not self._stop_event.is_set() and condition_fn():
                 iteration_start = time.perf_counter()
                 try:
@@ -337,3 +345,4 @@ class RateControl:
             std_dev_deviation=std_dev_deviation,
             deviations=self.deviations
         )
+
