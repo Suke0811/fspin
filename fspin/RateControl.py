@@ -54,7 +54,7 @@ class ReportLogger:
     def generate_report(self, freq, loop_duration, initial_duration, total_duration,
                         total_iterations, avg_frequency, avg_function_duration,
                         avg_loop_duration, avg_deviation, max_deviation, std_dev_deviation,
-                        deviations):
+                        deviations, exceptions):
         self.output("\n=== RateControl Report ===")
         self.output(f"Set Frequency                  : {freq} Hz")
         self.output(f"Set Loop Duration              : {loop_duration * 1e3:.3f} ms")
@@ -68,6 +68,7 @@ class ReportLogger:
         self.output(f"Average Deviation from Desired : {avg_deviation * 1e3:.3f} ms")
         self.output(f"Maximum Deviation              : {max_deviation * 1e3:.3f} ms")
         self.output(f"Std Dev of Deviations          : {std_dev_deviation * 1e3:.3f} ms")
+        self.output(f"Exception Thrown               : {len(exceptions)} times")
         self.output("Distribution of Deviation from Desired Loop Duration (ms):")
         self.output(self.create_histogram(deviations))
         self.output("===========================\n")
@@ -117,12 +118,13 @@ class RateControl:
         :param report: Enables performance reporting if True.
         :param thread: Use threading for synchronous functions if True.
         """
-        self.freq = freq
+        self.loop_start_time = time.perf_counter()
+        self._freq = freq
         self.loop_duration = 1.0 / freq  # Desired loop duration (seconds)
         self.is_coroutine = is_coroutine
         self.report = report
         self.thread = thread
-        self.loop_start_time = time.perf_counter()
+        self.exceptions = []
         if is_coroutine:
             try:
                 asyncio.get_running_loop()
@@ -170,6 +172,7 @@ class RateControl:
                 try:
                     func(*args, **kwargs)
                 except Exception as e:
+                    self.exceptions.append(e)
                     func_name = getattr(func, "__name__", "<anonymous>")
                     logging.exception("Exception in spinning function '%s'", func_name)
                     traceback.print_exc()
@@ -226,6 +229,7 @@ class RateControl:
                 try:
                     await func(*args, **kwargs)
                 except Exception as e:
+                    self.exceptions.append(e)
                     func_name = getattr(func, "__name__", "<anonymous>")
                     logging.exception("Exception in spinning coroutine '%s'", func_name)
                     traceback.print_exc()
@@ -337,17 +341,17 @@ class RateControl:
 
         if output:
             self.logger.generate_report(
-                freq=self.freq, loop_duration=self.loop_duration, initial_duration=self.initial_duration,
+                freq=self._freq, loop_duration=self.loop_duration, initial_duration=self.initial_duration,
                 total_duration=total_duration, total_iterations=total_iterations, avg_frequency=avg_frequency,
                 avg_function_duration=avg_function_duration, avg_loop_duration=avg_loop_duration,
                 avg_deviation=avg_deviation, max_deviation=max_deviation, std_dev_deviation=std_dev_deviation,
-                deviations=self.deviations)
+                deviations=self.deviations, exceptions=self.exceptions)
 
-        return {"frequency": self.freq, "loop_duration": self.loop_duration, "initial_duration": self.initial_duration,
+        return {"frequency": self._freq, "loop_duration": self.loop_duration, "initial_duration": self.initial_duration,
                 "total_duration": total_duration, "total_iterations": total_iterations, "avg_frequency": avg_frequency,
                 "avg_function_duration": avg_function_duration, "avg_loop_duration": avg_loop_duration,
                 "avg_deviation": avg_deviation, "max_deviation": max_deviation, "std_dev_deviation": std_dev_deviation,
-                "deviations": self.deviations,}
+                "deviations": self.deviations, "exceptions": self.exceptions, "exception_count": self.exception_count}
 
     def is_running(self):
         return not self._stop_event.is_set()
@@ -361,14 +365,14 @@ class RateControl:
     @property
     def frequency(self):
         """Get the current loop frequency in Hz."""
-        return self.freq
+        return self._freq
 
     @frequency.setter
     def frequency(self, value):
         """Set the loop frequency and update loop duration accordingly."""
         if value <= 0:
             raise ValueError("Frequency must be greater than zero.")
-        self.freq = value
+        self._freq = value
         self.loop_duration = 1.0 / value
 
     @property
@@ -379,11 +383,15 @@ class RateControl:
     def mode(self):
         return "async" if self.is_coroutine else "sync-threaded" if self.thread else "sync-blocking"
 
+    @property
+    def exception_count(self):
+        return len(self.exceptions)
+
     def __str__(self):
         lines = [
             "=== RateControl Status ===",
             f"Mode                 : {self.mode}",
-            f"Target Frequency     : {self.freq:.3f} Hz",
+            f"Target Frequency     : {self._freq:.3f} Hz",
             f"Loop Duration        : {self.loop_duration * 1e3:.3f} ms",
             f"Elapsed Time         : {self.elapsed_time:.3f} s",
             f"Running              : {self.status}",
@@ -401,7 +409,7 @@ class RateControl:
         return "\n".join(lines)
 
     def __repr__(self):
-        return (f"<RateControl freq={self.freq:.2f}Hz, duration={self.loop_duration * 1e3:.2f}ms, "
+        return (f"<RateControl _freq={self._freq:.2f}Hz, duration={self.loop_duration * 1e3:.2f}ms, "
                 f"elapsed={self.elapsed_time:.2f}s, status={self.status}>")
 
 
