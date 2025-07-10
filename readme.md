@@ -5,7 +5,7 @@ A small utility for running Python functions or coroutines at a fixed rate. It o
 [![Version](https://img.shields.io/badge/version-0.2.x-blue.svg)](https://github.com/Suke0811/fspin/releases)
 [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
 [![Tests](https://github.com/Suke0811/fspin/actions/workflows/ci.yml/badge.svg)](https://github.com/Suke0811/fspin/actions/workflows/ci.yml)
-![Coverage](./coverage.svg)
+![Coverage](coverage.svg)
 
 ## Features
 - `loop()` context manager for scoped background loops
