@@ -181,7 +181,7 @@ def test_spin_async_exception_handling(caplog):
 def test_generate_report_no_iterations(caplog):
     rc = RateControl(freq=10, is_coroutine=False, report=True, thread=False)
     with caplog.at_level(logging.INFO):
-        rc.generate_report()
+        rc.get_report()
     assert any("No iterations were recorded" in r.getMessage() for r in caplog.records)
 
 def test_loop_context_manager_basic_counts():
