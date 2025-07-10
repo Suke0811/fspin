@@ -1,4 +1,4 @@
-from fspin import loop  # wherever you defined loop/RateControl
+from fspin import loop
 import time
 
 def heartbeat(prefix='main'):
@@ -21,7 +21,7 @@ with loop(hb, freq=5, report=True):
     time.sleep(1)
 
 # Manually terminating the looping. report info accessible from lp instance.
-with loop(heartbeat, freq=5, report=True) as lp:
+with loop(heartbeat, freq=50, report=True) as lp:
     # Let it run for 1 s, then stop spinning manually
     time.sleep(1)
     lp.stop_spinning()
