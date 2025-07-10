@@ -98,6 +98,7 @@ def spin(freq, condition_fn=None, report=False, thread=False):
             return sync_wrapper
     return decorator
 
+
 @contextmanager
 def loop(func, freq, condition_fn=None, report=False, thread=True, *args, **kwargs):
     """support for with format"""
@@ -129,8 +130,8 @@ class RateControl:
             try:
                 asyncio.get_running_loop()
             except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                lp = asyncio.new_event_loop()
+                asyncio.set_event_loop(lp)
             self._stop_event = asyncio.Event()
         else:
             self._stop_event = threading.Event()
@@ -161,7 +162,8 @@ class RateControl:
     def spin_sync(self, func, condition_fn, *args, **kwargs):
         """Synchronous spinning using threading with deviation compensation."""
         if condition_fn is None:
-            condition_fn = lambda: True
+            def condition_fn():
+                return True
 
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
@@ -218,7 +220,8 @@ class RateControl:
     async def spin_async(self, func, condition_fn, *args, **kwargs):
         """Asynchronous spinning using asyncio with deviation compensation."""
         if condition_fn is None:
-            condition_fn = lambda: True  # Default to infinite loop
+            def condition_fn():
+                return True
 
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
@@ -411,9 +414,3 @@ class RateControl:
     def __repr__(self):
         return (f"<RateControl _freq={self._freq:.2f}Hz, duration={self.loop_duration * 1e3:.2f}ms, "
                 f"elapsed={self.elapsed_time:.2f}s, status={self.status}>")
-
-
-
-
-
-
