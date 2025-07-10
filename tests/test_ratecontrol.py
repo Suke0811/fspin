@@ -11,7 +11,7 @@ def test_create_histogram():
     logger = ReportLogger(enabled=True)
     data = [0.001, 0.002, 0.003]
     hist = logger.create_histogram(data, bins=2, bar_width=10)
-    lines = hist.splitlines()
+    lines = hist.strip().splitlines()
     assert len(lines) == 2
     assert all("ms" in line for line in lines)
 
@@ -44,6 +44,7 @@ def test_generate_report_outputs():
         max_deviation=0.002,
         std_dev_deviation=0.0005,
         deviations=[0.001, 0.002],
+        exceptions=[],
     )
     joined = "\n".join(logger.messages)
     assert "RateControl Report" in joined
@@ -215,4 +216,39 @@ def test_loop_context_manager_with_args_kwargs():
 
     # All calls should see the same arguments
     assert all(c == (7, 8) for c in calls), f"unexpected args: {calls}"
+
+
+def test_frequency_property_updates_duration():
+    rc = RateControl(freq=10, is_coroutine=False, report=False, thread=False)
+    assert rc.loop_duration == pytest.approx(0.1)
+    rc.frequency = 20
+    assert rc.loop_duration == pytest.approx(0.05)
+    assert rc.frequency == 20
+
+
+def test_exception_tracking_and_report():
+    calls = []
+
+    def condition():
+        return len(calls) < 2
+
+    def work():
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("boom")
+
+    rc = RateControl(freq=1000, is_coroutine=False, report=True, thread=False)
+    rc.start_spinning(work, condition)
+    report = rc.get_report(output=False)
+    assert rc.exception_count == 1
+    assert report["exception_count"] == 1
+    assert isinstance(report["exceptions"][0], RuntimeError)
+
+
+def test_str_and_repr_contain_info():
+    rc = RateControl(freq=5, is_coroutine=False, report=False, thread=False)
+    s = str(rc)
+    r = repr(rc)
+    assert "RateControl Status" in s
+    assert "_freq" in r
 
