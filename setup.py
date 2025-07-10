@@ -25,6 +25,11 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     author=PACKAGE_AUTHOR,
+    url="https://github.com/Suke0811/fspin",
+    project_urls={
+        "Source": "https://github.com/Suke0811/fspin",
+        "Tracker": "https://github.com/Suke0811/fspin/issues",
+    },
     license='MIT',
     packages=find_packages(include=[PACKAGE_NAME, PACKAGE_NAME + '.*']),
     install_requires=requirements,
