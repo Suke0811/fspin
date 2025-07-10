@@ -8,7 +8,7 @@ This directory contains simple usage examples for **fspin**. Each example demons
 | `sync_manual.py`       | Use `rate` directly with a synchronous function.            |
 | `async_decorator.py`   | Run an asynchronous coroutine with the decorator.           |
 | `async_manual.py`      | Use `rate` directly with an async coroutine.                |
-| `loop_in_place.py`     | Use context managet `with loop(...):`.                      |
+| `loop_in_place.py`     | Use context manager `with loop(...):`.                      |
 | `dynamic_frequency.py` | Change the loop frequency at runtime.                       |
 
 Run any example with `python <file>` to see the behaviour.
