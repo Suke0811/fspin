@@ -1,3 +1,14 @@
+"""Helpers for running callables at a fixed rate.
+
+This module exposes the :class:`RateControl` class along with the
+``spin`` decorator and ``loop`` context manager.  They allow functions or
+coroutines to be repeatedly executed at a specified frequency while
+optionally collecting timing statistics.
+
+Logging is left unconfigured by default – attach your own handlers to the
+``fspin`` loggers if you want output.
+"""
+
 import time
 import warnings
 import threading
@@ -78,10 +89,29 @@ class ReportLogger:
 
 
 def spin(freq, condition_fn=None, report=False, thread=False):
-    """
-    Decorator to run the decorated function at a specified frequency (Hz).
-    Automatically detects if the function is a coroutine and runs it accordingly.
-    Optionally generates a performance report upon completion if report is True.
+    """Decorator to repeatedly call a function at ``freq`` Hz.
+
+    Works transparently with both synchronous and asynchronous functions.
+
+    Parameters
+    ----------
+    freq : float
+        Target frequency in Hertz.  Must be greater than zero.
+    condition_fn : callable, optional
+        Function returning ``True`` to continue looping.  If ``None`` the
+        function runs until :meth:`RateControl.stop_spinning` is called.
+    report : bool, default ``False``
+        When ``True``, execution statistics are collected and printed when the
+        loop stops.
+    thread : bool, default ``False``
+        If ``True`` synchronous functions run in a background thread so the
+        wrapped call returns immediately.  Ignored for coroutine functions.
+
+    Returns
+    -------
+    callable
+        Wrapper that starts the loop and returns the :class:`RateControl`
+        instance controlling it.
     """
     def decorator(func):
         is_coroutine = asyncio.iscoroutinefunction(func)
@@ -104,7 +134,38 @@ def spin(freq, condition_fn=None, report=False, thread=False):
 
 @contextmanager
 def loop(func, freq, condition_fn=None, report=False, thread=True, *args, **kwargs):
-    """support for with format"""
+    """Context manager for running ``func`` in a background loop.
+
+    Works with regular functions and coroutines alike and stops
+    automatically when leaving the ``with`` block.
+
+    Parameters
+    ----------
+    func : callable
+        Target function or coroutine to execute.
+    freq : float
+        Desired frequency in Hertz. Must be greater than zero.
+    condition_fn : callable, optional
+        Function returning ``True`` while the loop should keep running.
+        If ``None`` the loop continues until :meth:`RateControl.stop_spinning`
+        is called.
+    report : bool, default ``False``
+        When ``True`` execution statistics are recorded and printed once
+        the loop stops.
+    thread : bool, default ``True``
+        For synchronous ``func`` runs the loop in a background thread so the
+        context enters immediately. Ignored for coroutines.
+    *args : Any
+        Positional arguments forwarded to ``func``.
+    **kwargs : Any
+        Keyword arguments forwarded to ``func``.
+
+    Returns
+    -------
+    RateControl
+        The ``RateControl`` instance managing the loop which can be queried or
+        stopped manually from inside the ``with`` block.
+    """
     rc = RateControl(freq, is_coroutine=asyncio.iscoroutinefunction(func), report=report, thread=thread)
     rc.start_spinning(func, condition_fn, *args, **kwargs)
     try:
@@ -114,13 +175,26 @@ def loop(func, freq, condition_fn=None, report=False, thread=True, *args, **kwar
 
 
 class RateControl:
+    """Utility to execute a function or coroutine at a fixed frequency.
+
+    A ``RateControl`` object manages the timing loop and can optionally
+    gather execution statistics which are accessible through
+    :meth:`get_report` or the object's properties.
+    """
     def __init__(self, freq, is_coroutine, report=False, thread=True):
-        """
-        Initialize RateControl.
-        :param freq: Frequency in Hz.
-        :param is_coroutine: Whether the target function is a coroutine.
-        :param report: Enables performance reporting if True.
-        :param thread: Use threading for synchronous functions if True.
+        """Create a ``RateControl`` instance.
+
+        Parameters
+        ----------
+        freq : float
+            Desired execution frequency in Hertz. Must be greater than zero.
+        is_coroutine : bool
+            ``True`` if the target callable is a coroutine function.
+        report : bool, default ``False``
+            Enable collection of timing statistics.
+        thread : bool, default ``True``
+            When ``True`` and the target is synchronous, the loop runs in a
+            background thread so ``start_spinning`` does not block.
         """
         self.loop_start_time = time.perf_counter()
         if freq <= 0:
@@ -307,9 +381,12 @@ class RateControl:
         await self.start_spinning_async(func, condition_fn, *args, **kwargs)
 
     def start_spinning(self, func, condition_fn, *args, **kwargs):
-        """
-        Starts the spinning process based on the mode.
-        Raises a TypeError if the function type does not match the mode.
+        """Begin calling ``func`` in a loop.
+
+        Parameters mirror :func:`spin`.  This method dispatches to the
+        synchronous or asynchronous implementation depending on how the
+        ``RateControl`` was created.  A :class:`TypeError` is raised if the
+        provided callable does not match the expected type.
         """
         if self.is_coroutine:
             if not asyncio.iscoroutinefunction(func):
@@ -334,9 +411,19 @@ class RateControl:
             self._own_loop = None
 
     def get_report(self, output=True):
-        """
-        Aggregates performance data and delegates report generation to the logger.
-        Return performance stats as a dictionary and logger print out if output=True
+        """Return collected performance statistics.
+
+        Parameters
+        ----------
+        output : bool, default ``True``
+            When ``True`` the report is also printed via the library logger.
+
+        Returns
+        -------
+        dict
+            A dictionary containing timing information such as average
+            frequency, deviation statistics and any exceptions raised by the
+            looped function.
         """
         if not self.report or not self.iteration_times:
             self.logger.output("No iterations were recorded.")
