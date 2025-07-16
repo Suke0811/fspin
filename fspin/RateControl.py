@@ -10,6 +10,7 @@ import logging
 
 # Library logger
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class ReportLogger:
