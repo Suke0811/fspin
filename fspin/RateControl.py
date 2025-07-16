@@ -8,8 +8,9 @@ import traceback
 from contextlib import contextmanager
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+# Library logger
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class ReportLogger:
@@ -19,12 +20,14 @@ class ReportLogger:
 
     def output(self, msg: str):
         if self.enabled:
-            logging.info(msg)
+            logger.info(msg)
             # print(msg)
 
     def create_histogram(self, data, bins=10, bar_width=50):
         if not data:
             return "No data to display."
+        if bins <= 0:
+            raise ValueError("bins must be greater than zero")
         data_ms = [d * 1e3 for d in data]  # Convert seconds to ms
         min_val = min(data_ms)
         max_val = max(data_ms)
@@ -120,18 +123,22 @@ class RateControl:
         :param thread: Use threading for synchronous functions if True.
         """
         self.loop_start_time = time.perf_counter()
+        if freq <= 0:
+            raise ValueError("Frequency must be greater than zero.")
         self._freq = freq
         self.loop_duration = 1.0 / freq  # Desired loop duration (seconds)
         self.is_coroutine = is_coroutine
         self.report = report
         self.thread = thread
         self.exceptions = []
+        self._own_loop = None
         if is_coroutine:
             try:
                 asyncio.get_running_loop()
             except RuntimeError:
                 lp = asyncio.new_event_loop()
                 asyncio.set_event_loop(lp)
+                self._own_loop = lp
             self._stop_event = asyncio.Event()
         else:
             self._stop_event = threading.Event()
@@ -176,7 +183,7 @@ class RateControl:
                 except Exception as e:
                     self.exceptions.append(e)
                     func_name = getattr(func, "__name__", "<anonymous>")
-                    logging.exception("Exception in spinning function '%s'", func_name)
+                    logger.exception("Exception in spinning function '%s'", func_name)
                     traceback.print_exc()
                     warnings.warn(
                         f"Exception in spinning function '{func_name}': {e}",
@@ -234,7 +241,7 @@ class RateControl:
                 except Exception as e:
                     self.exceptions.append(e)
                     func_name = getattr(func, "__name__", "<anonymous>")
-                    logging.exception("Exception in spinning coroutine '%s'", func_name)
+                    logger.exception("Exception in spinning coroutine '%s'", func_name)
                     traceback.print_exc()
                     warnings.warn(
                         f"Exception in spinning coroutine '{func_name}': {e}",
@@ -322,6 +329,9 @@ class RateControl:
         else:
             if self._thread:
                 self._thread.join()
+        if self._own_loop is not None:
+            self._own_loop.close()
+            self._own_loop = None
 
     def get_report(self, output=True):
         """
