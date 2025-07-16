@@ -253,7 +253,7 @@ def test_str_and_repr_contain_info():
     assert "_freq" in r
 
 
-def test_import_does_not_configure_logging(monkeypatch):
+def test_import_does_not_configure_logging():
     import importlib
     root = logging.getLogger()
     root.handlers.clear()
