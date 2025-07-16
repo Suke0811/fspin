@@ -252,3 +252,32 @@ def test_str_and_repr_contain_info():
     assert "RateControl Status" in s
     assert "_freq" in r
 
+
+def test_import_does_not_configure_logging(monkeypatch):
+    import importlib
+    root = logging.getLogger()
+    root.handlers.clear()
+    import fspin.RateControl as rc
+    importlib.reload(rc)
+    assert not root.handlers
+
+
+def test_invalid_frequency():
+    with pytest.raises(ValueError):
+        RateControl(freq=0, is_coroutine=False)
+    with pytest.raises(ValueError):
+        RateControl(freq=-1, is_coroutine=True)
+
+
+def test_create_histogram_invalid_bins():
+    logger = ReportLogger(enabled=True)
+    with pytest.raises(ValueError):
+        logger.create_histogram([0.001], bins=0)
+
+
+def test_event_loop_closed_on_stop():
+    rc = RateControl(freq=1, is_coroutine=True)
+    assert rc._own_loop is not None
+    rc.stop_spinning()
+    assert rc._own_loop is None or rc._own_loop.is_closed()
+
