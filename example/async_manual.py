@@ -1,8 +1,6 @@
 import os
 import sys
 import asyncio
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from fspin import rate
 
 counter = {'count': 0}
@@ -18,6 +16,7 @@ async def main_loop():
 async def run():
     rc = rate(freq=2, is_coroutine=True, report=True)
     await rc.start_spinning_async_wrapper(main_loop, condition)
+    # Report is generated automatically when report=True
 
 if __name__ == "__main__":
     asyncio.run(run())

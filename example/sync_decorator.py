@@ -1,8 +1,6 @@
 import os
 import sys
 import time
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from fspin import spin
 
 # stop after five iterations
@@ -18,4 +16,5 @@ def main_loop():
     time.sleep(0.1)
 
 if __name__ == "__main__":
-    main_loop()
+    rc = main_loop()
+    # Report is generated automatically when report=True

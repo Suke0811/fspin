@@ -1,8 +1,6 @@
 import os
 import sys
 import time
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from fspin import rate
 
 
@@ -18,4 +16,4 @@ if __name__ == "__main__":
     rc.frequency = 4
     time.sleep(2)
     rc.stop_spinning()
-    rc.get_report()
+    # Report is generated automatically when report=True

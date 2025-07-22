@@ -1,8 +1,6 @@
 import os
 import sys
 import asyncio
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from fspin import spin
 
 counter = {'count': 0}
@@ -17,4 +15,5 @@ async def main_loop():
     await asyncio.sleep(0.1)
 
 if __name__ == "__main__":
-    asyncio.run(main_loop())
+    rc = asyncio.run(main_loop())
+    # Report is generated automatically when report=True
