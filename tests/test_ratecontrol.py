@@ -3,8 +3,16 @@ import time
 import types
 import logging
 import pytest
+import sys
+import os
 
-from fspin.RateControl import ReportLogger, RateControl, spin, loop
+# Add the parent directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fspin.reporting import ReportLogger
+from fspin.rate_control import RateControl
+from fspin.decorators import spin
+from fspin.loop_context import loop
 
 
 def test_create_histogram():
@@ -45,10 +53,13 @@ def test_generate_report_outputs():
         std_dev_deviation=0.0005,
         deviations=[0.001, 0.002],
         exceptions=[],
+        mode="async"
     )
     joined = "\n".join(logger.messages)
     assert "RateControl Report" in joined
     assert "Set Frequency" in joined
+    assert "Execution Mode" in joined
+    assert "async" in joined
     assert "histogram" not in joined  # ensure create_histogram didn't crash
 
 
@@ -281,3 +292,46 @@ def test_event_loop_closed_on_stop():
     rc.stop_spinning()
     assert rc._own_loop is None or rc._own_loop.is_closed()
 
+
+def test_automatic_report_generation_sync(caplog):
+    calls = []
+
+    def condition():
+        return len(calls) < 2
+
+    def work():
+        calls.append(1)
+
+    with caplog.at_level(logging.INFO, logger="root"):
+        rc = RateControl(freq=1000, is_coroutine=False, report=True, thread=False)
+        rc.start_spinning(work, condition)
+        # Don't call get_report() explicitly, it should be called automatically
+
+    assert len(calls) == 2
+    assert any("RateControl Report" in r.getMessage() for r in caplog.records)
+    assert any("Execution Mode" in r.getMessage() for r in caplog.records)
+    assert any("sync-blocking" in r.getMessage() for r in caplog.records)
+
+
+def test_automatic_report_generation_async(caplog):
+    calls = []
+
+    def condition():
+        return len(calls) < 2
+
+    async def awork():
+        calls.append(1)
+        await asyncio.sleep(0)
+
+    async def runner():
+        with caplog.at_level(logging.INFO, logger="root"):
+            rc = RateControl(freq=1000, is_coroutine=True, report=True)
+            await rc.start_spinning_async_wrapper(awork, condition)
+            # Don't call get_report() explicitly, it should be called automatically
+
+    asyncio.run(runner())
+
+    assert len(calls) == 2
+    assert any("RateControl Report" in r.getMessage() for r in caplog.records)
+    assert any("Execution Mode" in r.getMessage() for r in caplog.records)
+    assert any("async" in r.getMessage() for r in caplog.records)
