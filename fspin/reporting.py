@@ -1,14 +1,28 @@
 import logging
 
+# Library logger
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+def _setup_terminal_logging():
+    root_logger = logging.getLogger()
+    if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        root_logger.addHandler(handler)
+        root_logger.setLevel(logging.INFO)
+
 class ReportLogger:
     """Holds all logging/reporting related functions and data formatting."""
-    def __init__(self, enabled: bool):
+    def __init__(self, enabled: bool, force_terminal: bool = True):
         self.enabled = enabled
+        if force_terminal:
+            _setup_terminal_logging()
 
     def output(self, msg: str):
         if self.enabled:
             logger.info(msg)
-            print(msg)
 
     def create_histogram(self, data, bins=10, bar_width=50):
         if not data:
@@ -64,7 +78,3 @@ class ReportLogger:
         self.output("Distribution of Deviation from Desired Loop Duration (ms):")
         self.output(self.create_histogram(deviations))
         self.output("===========================\n")
-
-# Library logger
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
