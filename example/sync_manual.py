@@ -1,8 +1,6 @@
 import os
 import sys
 import time
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from fspin import rate
 
 counter = {'count': 0}
@@ -18,3 +16,4 @@ def main_loop():
 if __name__ == "__main__":
     rc = rate(freq=2, is_coroutine=False, report=True, thread=False)
     rc.start_spinning(main_loop, condition)
+    # Report is generated automatically when report=True
