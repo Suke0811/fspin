@@ -105,7 +105,7 @@ class RateControl:
             self.start_time = None
             self.end_time = None
 
-        self.logger = ReportLogger(report)
+        self.logger = ReportLogger(report, force_terminal=True)
 
         # Always maintain deviation accumulator for loop compensation.
         self.deviation_accumulator = 0.0

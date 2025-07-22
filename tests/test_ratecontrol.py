@@ -290,7 +290,7 @@ def test_event_loop_closed_on_stop():
     assert rc._own_loop is None or rc._own_loop.is_closed()
 
 
-def test_automatic_report_generation_sync(caplog):
+def test_automatic_report_generation_sync():
     calls = []
 
     def condition():
@@ -299,18 +299,16 @@ def test_automatic_report_generation_sync(caplog):
     def work():
         calls.append(1)
 
-    with caplog.at_level(logging.INFO, logger="root"):
-        rc = RateControl(freq=1000, is_coroutine=False, report=True, thread=False)
-        rc.start_spinning(work, condition)
-        # Don't call get_report() explicitly, it should be called automatically
+    rc = RateControl(freq=1000, is_coroutine=False, report=True, thread=False)
+    rc.start_spinning(work, condition)
+    # Don't call get_report() explicitly, it should be called automatically
 
     assert len(calls) == 2
-    assert any("RateControl Report" in r.getMessage() for r in caplog.records)
-    assert any("Execution Mode" in r.getMessage() for r in caplog.records)
-    assert any("sync-blocking" in r.getMessage() for r in caplog.records)
+    assert rc.logger.report_generated, "Report was not automatically generated"
+    assert rc.mode == "sync-blocking", "Incorrect mode detected"
 
 
-def test_automatic_report_generation_async(caplog):
+def test_automatic_report_generation_async():
     calls = []
 
     def condition():
@@ -321,14 +319,13 @@ def test_automatic_report_generation_async(caplog):
         await asyncio.sleep(0)
 
     async def runner():
-        with caplog.at_level(logging.INFO, logger="root"):
-            rc = RateControl(freq=1000, is_coroutine=True, report=True)
-            await rc.start_spinning_async_wrapper(awork, condition)
-            # Don't call get_report() explicitly, it should be called automatically
+        rc = RateControl(freq=1000, is_coroutine=True, report=True)
+        await rc.start_spinning_async_wrapper(awork, condition)
+        # Don't call get_report() explicitly, it should be called automatically
+        return rc
 
-    asyncio.run(runner())
+    rc = asyncio.run(runner())
 
     assert len(calls) == 2
-    assert any("RateControl Report" in r.getMessage() for r in caplog.records)
-    assert any("Execution Mode" in r.getMessage() for r in caplog.records)
-    assert any("async" in r.getMessage() for r in caplog.records)
+    assert rc.logger.report_generated, "Report was not automatically generated"
+    assert rc.mode == "async", "Incorrect mode detected"

@@ -17,12 +17,14 @@ class ReportLogger:
     """Holds all logging/reporting related functions and data formatting."""
     def __init__(self, enabled: bool, force_terminal: bool = True):
         self.enabled = enabled
+        self.report_generated = False
         if force_terminal:
             _setup_terminal_logging()
 
     def output(self, msg: str):
         if self.enabled:
             logger.info(msg)
+            print(msg)
 
     def create_histogram(self, data, bins=10, bar_width=50):
         if not data:
@@ -59,6 +61,7 @@ class ReportLogger:
                         total_iterations, avg_frequency, avg_function_duration,
                         avg_loop_duration, avg_deviation, max_deviation, std_dev_deviation,
                         deviations, exceptions, mode=None):
+        self.report_generated = True
         self.output("\n=== RateControl Report ===")
         if mode:
             self.output(f"Execution Mode                 : {mode}")
