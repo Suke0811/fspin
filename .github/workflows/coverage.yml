@@ -30,7 +30,6 @@ jobs:
         run: |
           coverage-badge -f -o coverage.svg
       - name: Commit badge
-        if: github.ref == 'refs/heads/main'
         uses: EndBug/add-and-commit@v9
         with:
           message: 'chore: update coverage badge [skip ci]'
