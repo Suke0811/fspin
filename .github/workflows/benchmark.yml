@@ -1,0 +1,170 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Duration of each test in seconds'
+        required: true
+        default: '3'
+      iterations:
+        description: 'Number of iterations for each test'
+        required: true
+        default: '3'
+
+jobs:
+  benchmark:
+    name: Benchmark on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        exclude:
+          # Python 3.14 is not available on all platforms yet
+          - os: ubuntu-latest
+            python-version: '3.14'
+          - os: windows-latest
+            python-version: '3.14'
+          - os: macos-latest
+            python-version: '3.14'
+          # Python 3.13 might not be available on all platforms yet
+          - os: ubuntu-latest
+            python-version: '3.13'
+          - os: windows-latest
+            python-version: '3.13'
+          - os: macos-latest
+            python-version: '3.13'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Modify benchmark parameters
+        run: |
+          python -c "
+          import os
+          with open('benchmark.py', 'r') as f:
+              content = f.read()
+          content = content.replace('TEST_DURATION = 3', f'TEST_DURATION = {os.environ[\"TEST_DURATION\"]}')
+          content = content.replace('NUM_ITERATIONS = 3', f'NUM_ITERATIONS = {os.environ[\"NUM_ITERATIONS\"]}')
+          with open('benchmark.py', 'w') as f:
+              f.write(content)
+          "
+        env:
+          TEST_DURATION: ${{ github.event.inputs.test_duration }}
+          NUM_ITERATIONS: ${{ github.event.inputs.iterations }}
+
+      - name: Run benchmark
+        run: python benchmark.py
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ matrix.os }}-python-${{ matrix.python-version }}
+          path: |
+            benchmark_results.json
+            benchmark_stats.json
+            benchmark_report.md
+
+  combine-reports:
+    name: Combine benchmark reports
+    needs: benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create combined report
+        run: |
+          python -c "
+          import os
+          import json
+          import glob
+          
+          # Create the combined report
+          with open('combined_benchmark_report.md', 'w') as report:
+              report.write('# fspin Benchmark Results\n\n')
+              report.write('## Test Configuration\n\n')
+              report.write(f'- Test Duration: ${{ github.event.inputs.test_duration }} seconds\n')
+              report.write(f'- Iterations per Test: ${{ github.event.inputs.iterations }}\n\n')
+              
+              report.write('## Results by Platform and Python Version\n\n')
+              
+              # Find all stats files
+              stats_files = glob.glob('artifacts/benchmark-results-*/benchmark_stats.json')
+              
+              # Sort by OS and Python version
+              def sort_key(path):
+                  parts = path.split('-')
+                  os_name = parts[2]
+                  python_version = parts[4].replace('python-', '')
+                  return (os_name, python_version)
+              
+              stats_files.sort(key=sort_key)
+              
+              # Process each stats file
+              for stats_file in stats_files:
+                  parts = stats_file.split('-')
+                  os_name = parts[2]
+                  python_version = parts[4].replace('python-', '')
+                  
+                  report.write(f'### {os_name} - Python {python_version}\n\n')
+                  
+                  with open(stats_file, 'r') as f:
+                      stats = json.load(f)
+                  
+                  system_info = stats['system_info']
+                  report.write(f'- OS: {system_info[\"os\"]} {system_info[\"os_version\"]}\n')
+                  report.write(f'- Python Version: {system_info[\"python_version\"]}\n')
+                  report.write(f'- Processor: {system_info[\"processor\"]}\n\n')
+                  
+                  # Synchronous results
+                  report.write('#### Synchronous Results\n\n')
+                  report.write('| Frequency (Hz) | Actual Frequency (Hz) | Std Dev Frequency (Hz) | Mean Deviation (ms) | Std Dev Deviation (ms) |\n')
+                  report.write('|----------------|------------------------|------------------------|---------------------|------------------------|\n')
+                  
+                  for freq in sorted([int(f) for f in stats['sync_stats'].keys()]):
+                      result = stats['sync_stats'][str(freq)]
+                      report.write(f'| {freq} | {result[\"mean_frequency\"]:.2f} | {result[\"std_frequency\"]:.2f} | {result[\"mean_deviation\"] * 1000:.3f} | {result[\"std_deviation\"] * 1000:.3f} |\n')
+                  
+                  report.write('\n')
+                  
+                  # Asynchronous results
+                  report.write('#### Asynchronous Results\n\n')
+                  report.write('| Frequency (Hz) | Actual Frequency (Hz) | Std Dev Frequency (Hz) | Mean Deviation (ms) | Std Dev Deviation (ms) |\n')
+                  report.write('|----------------|------------------------|------------------------|---------------------|------------------------|\n')
+                  
+                  for freq in sorted([int(f) for f in stats['async_stats'].keys()]):
+                      result = stats['async_stats'][str(freq)]
+                      report.write(f'| {freq} | {result[\"mean_frequency\"]:.2f} | {result[\"std_frequency\"]:.2f} | {result[\"mean_deviation\"] * 1000:.3f} | {result[\"std_deviation\"] * 1000:.3f} |\n')
+                  
+                  report.write('\n')
+          "
+
+      - name: Upload combined report
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-benchmark-report
+          path: combined_benchmark_report.md
