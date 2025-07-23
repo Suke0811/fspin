@@ -2,7 +2,7 @@ import asyncio
 from functools import wraps
 from .rate_control import RateControl
 
-def spin(freq, condition_fn=None, report=False, thread=False):
+def spin(freq, condition_fn=None, report=False, thread=False, wait=True):
     """
     Decorator to run the decorated function at a specified frequency (Hz).
 
@@ -16,6 +16,8 @@ def spin(freq, condition_fn=None, report=False, thread=False):
             Defaults to None (always continue).
         report (bool, optional): Enable performance reporting. Defaults to False.
         thread (bool, optional): Use threading for synchronous functions. Defaults to False.
+        wait (bool, optional): For async functions, whether to await the task (blocking)
+            or return immediately (fire-and-forget). Defaults to True (blocking).
 
     Returns:
         callable: A decorated function that will run at the specified frequency.
@@ -28,6 +30,10 @@ def spin(freq, condition_fn=None, report=False, thread=False):
         >>> @spin(freq=5, report=True)
         ... async def my_coroutine():
         ...     print("Running at 5Hz with reporting")
+        >>> 
+        >>> @spin(freq=5, wait=False)
+        ... async def background_task():
+        ...     print("Running in the background")
     """
     def decorator(func):
         is_coroutine = asyncio.iscoroutinefunction(func)
@@ -35,7 +41,15 @@ def spin(freq, condition_fn=None, report=False, thread=False):
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 rc = RateControl(freq, is_coroutine=True, report=report, thread=thread)
-                await rc.start_spinning(func, condition_fn, *args, **kwargs)
+                task = await rc.start_spinning_async(func, condition_fn, *args, **kwargs)
+
+                if wait:
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        # Task was cancelled, which is expected when condition is met
+                        pass
+
                 return rc
             return async_wrapper
         else:

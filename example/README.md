@@ -6,8 +6,10 @@ This directory contains simple usage examples for **fspin**. Each example demons
 |------------------------|-------------------------------------------------------------|
 | `sync_decorator.py`    | Run a synchronous function at a fixed rate using the `@spin` decorator. |
 | `sync_manual.py`       | Use `rate` directly with a synchronous function.            |
-| `async_decorator.py`   | Run an asynchronous coroutine with the decorator.           |
-| `async_manual.py`      | Use `rate` directly with an async coroutine.                |
+| `async_decorator.py`   | Run an async function with the `@spin` decorator, showing both blocking and non-blocking patterns. |
+| `async_manual.py`      | Use `rate` directly with an async function, showing both blocking and non-blocking patterns. |
+| `async_fire_and_forget.py` | Demonstrate the fire-and-forget pattern with both the `@spin` decorator and the `loop` context manager. |
+| `async_loop_context.py`| Use the `loop` context manager with async functions, showing auto-detection of coroutines and both blocking and non-blocking patterns. |
 | `loop_in_place.py`     | Use context manager `with loop(...):`.                      |
 | `dynamic_frequency.py` | Change the loop frequency at runtime.                       |
 
@@ -25,7 +27,7 @@ You can copy‑paste this section into a large language model to get help or qui
 ### `spin`
 
 ```python
-@spin(freq, condition_fn=None, report=False, thread=False)
+@spin(freq, condition_fn=None, report=False, thread=False, wait=True)
 ```
 
 - Decorator that repeatedly calls the decorated function at `freq` Hz.
@@ -33,16 +35,23 @@ You can copy‑paste this section into a large language model to get help or qui
 - `condition_fn` *(optional)* – function returning `True` to keep looping.
 - `report` – when `True`, execution statistics are recorded and printed when the loop stops.
 - `thread` – if `True`, synchronous functions run in a background thread so the call immediately returns.
+- `wait` – for async functions, if `True` (default), awaits the task to completion (blocking); if `False`, returns immediately (fire-and-forget).
 
 ### `loop`
 
 ```python
-with loop(func, freq, condition_fn=None, report=False, thread=True, *args, **kwargs) as rc:
+# For synchronous functions
+with loop(func, freq, condition_fn=None, report=False, thread=True, **kwargs) as rc:
+    ...
+
+# For asynchronous functions
+async with loop(async_func, freq, condition_fn=None, report=False, **kwargs) as rc:
     ...
 ```
 
 - Context manager that starts `func` looping on entry and automatically stops on exit.
-- Provides the same options as `spin` but always runs in the background.
+- Automatically detects if the function is a coroutine and uses the appropriate context manager.
+- Provides the same options as `spin` but runs in the background for synchronous functions.
 - The returned object `rc` is an instance of `RateControl` which can be queried or manually stopped.
 
 ### `rate` / `RateControl`

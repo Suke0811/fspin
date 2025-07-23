@@ -13,6 +13,8 @@ A small utility for running Python functions or coroutines at a fixed rate. It o
 - `rate` / `RateControl` class for manual control
 - Adjustable frequency at runtime
 - Optional detailed performance reports
+- Auto-detection of coroutines (no need to specify `is_async=True`)
+- Support for both blocking and fire-and-forget patterns for async functions
 
 ## Usage
 ```python
@@ -25,7 +27,7 @@ def function_to_loop():
   # things to loop
   time.sleep(0.0005) # a fake task to take 0.5ms
 
-  
+
 # call the function
 function_to_loop() # this will be blocking, and start looping
 # it'll automatically catch the keyboard interrupt
@@ -66,6 +68,36 @@ time.sleep(3)
 rc.stop_spinning()
 ```
 
+
+### Async with Fire-and-Forget Pattern
+```python
+import asyncio
+from fspin import spin, loop
+
+# Using the @spin decorator with wait=False for fire-and-forget
+@spin(freq=10, report=True, wait=False)
+async def background_task():
+    print("Running in the background")
+    await asyncio.sleep(0.1)
+
+async def main():
+    # This returns immediately without waiting for all iterations
+    rc = await background_task()
+    print("Continuing with other work while task runs in background")
+    await asyncio.sleep(1)  # Do other work
+    rc.stop_spinning()  # Stop the background task when done
+
+# Using the loop context manager with wait=False
+async def another_task():
+    print("Another background task")
+    await asyncio.sleep(0.1)
+
+async def another_main():
+    async with loop(another_task, freq=10, report=True) as lp:
+        print("Context manager returned immediately")
+        await asyncio.sleep(1)  # Do other work
+    # Task is stopped when exiting the context
+```
 
 ### More Examples
 See [the examples](example/README.md) for complete synchronous and asynchronous demos.
@@ -126,5 +158,3 @@ To install the latest stable release using pip. [![PyPI Downloads](https://stati
 ```bash
 pip install fspin
 ````
-
-
