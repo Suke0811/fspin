@@ -211,15 +211,25 @@ async def main():
     # Run asynchronous benchmarks
     await run_async_benchmark(collector)
 
-    # Save results
-    collector.save_results("benchmark_results.json")
-    collector.save_statistics("benchmark_stats.json")
+    # Get the directory where the script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Generate markdown report
-    generate_markdown_report("benchmark_stats.json", "benchmark_report.md")
+    # Save results with absolute paths
+    collector.save_results(os.path.join(script_dir, "benchmark_results.json"))
+    collector.save_statistics(os.path.join(script_dir, "benchmark_stats.json"))
 
-    print("Benchmarks completed. Results saved to benchmark_results.json and benchmark_stats.json.")
-    print("Markdown report saved to benchmark_report.md.")
+    # Generate markdown report with absolute paths
+    generate_markdown_report(
+        os.path.join(script_dir, "benchmark_stats.json"), 
+        os.path.join(script_dir, "benchmark_report.md")
+    )
+
+    results_path = os.path.join(script_dir, "benchmark_results.json")
+    stats_path = os.path.join(script_dir, "benchmark_stats.json")
+    report_path = os.path.join(script_dir, "benchmark_report.md")
+
+    print(f"Benchmarks completed. Results saved to {results_path} and {stats_path}.")
+    print(f"Markdown report saved to {report_path}.")
 
 if __name__ == "__main__":
     asyncio.run(main())
