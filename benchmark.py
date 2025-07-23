@@ -103,8 +103,7 @@ def run_sync_benchmark(collector):
 
             # Define the test function
             def sync_test():
-                # Simple function that simulates some work
-                time.sleep(0.0001)  # Small sleep to simulate work
+                # No sleep to allow maximum frequency
                 return time.time() >= stop_time
 
             # Run the benchmark using loop context manager
