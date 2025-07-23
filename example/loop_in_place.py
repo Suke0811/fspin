@@ -64,32 +64,8 @@ async def run_async_examples():
         # after 1sec it will exist.
         # if report is true, then report shows up
     # Report is generated automatically when report=True
+    # All other functiosn are the same as sync
 
-    # Passing arguments to async function
-    print("\nPassing arguments to async function:")
-    async with loop(async_heartbeat, freq=5, report=True, prefix='my_async_loop'):
-        await asyncio.sleep(1)
-    # Report is generated automatically when report=True
-
-    # Using functools.partial with async function
-    print("\nUsing functools.partial with async function:")
-    async_hb = partial(async_heartbeat, 'my_another_async_loop')
-    async with loop(async_hb, freq=5, report=True):
-        await asyncio.sleep(1)
-    # Report is generated automatically when report=True
-
-    # Manually stopping the async loop
-    print("\nManually stopping the async loop:")
-    async with loop(async_heartbeat, freq=50, report=True) as lp:
-        # Let it run for 1 s, then stop spinning manually
-        await asyncio.sleep(1)
-        lp.stop_spinning()
-        print("Manually stopped after 1 s")
-
-    # Once out of the with-block, lp is still available:
-    print(f"Total iterations recorded: {len(lp.iteration_times)}")
-    print("Deviations (s):", lp.deviations)
-    # lp.get_report()
 
 # Run both synchronous and asynchronous examples
 if __name__ == "__main__":
