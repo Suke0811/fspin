@@ -5,7 +5,7 @@ import asyncio
 import json
 import platform
 import statistics
-from fspin import spin, loop, aloop
+from fspin import spin, loop
 
 # Frequencies to test
 FREQUENCIES = [10, 100, 1000, 2000, 5000, 10000]
@@ -58,10 +58,8 @@ class ResultCollector:
             deviations = [r["std_dev_deviation"] for r in results]
             stats["sync_stats"][freq] = {
                 "mean_frequency": statistics.mean(actual_freqs),
-                "std_frequency": statistics.stdev(actual_freqs) if len(actual_freqs) > 1 else 0,
                 "mean_deviation": statistics.mean(deviations),
-                "std_deviation": statistics.stdev(deviations) if len(deviations) > 1 else 0,
-            }
+           }
 
         # Calculate statistics for async results
         for freq, results in self.results["async_results"].items():
@@ -69,9 +67,7 @@ class ResultCollector:
             deviations = [r["std_dev_deviation"] for r in results]
             stats["async_stats"][freq] = {
                 "mean_frequency": statistics.mean(actual_freqs),
-                "std_frequency": statistics.stdev(actual_freqs) if len(actual_freqs) > 1 else 0,
                 "mean_deviation": statistics.mean(deviations),
-                "std_deviation": statistics.stdev(deviations) if len(deviations) > 1 else 0,
             }
 
         return stats
@@ -148,7 +144,7 @@ async def run_async_benchmark(collector):
                 return time.time() >= stop_time
 
             # Run the benchmark using async loop context manager
-            async with aloop(async_test, freq=freq, report=True, thread=True) as rc:
+            async with loop(async_test, freq=freq, report=True, thread=True) as rc:
                 # Wait until the test duration is complete
                 await asyncio.sleep(TEST_DURATION)
 
@@ -187,23 +183,23 @@ def generate_markdown_report(stats_file, output_file):
 
         # Write synchronous results
         f.write("## Synchronous Results\n\n")
-        f.write("| Frequency (Hz) | Actual Frequency (Hz) | Std Dev Frequency (Hz) | Mean Deviation (ms) | Std Dev Deviation (ms) |\n")
-        f.write("|----------------|------------------------|------------------------|---------------------|------------------------|\n")
+        f.write("| Frequency (Hz) | Actual Frequency (Hz) |  Mean Deviation (ms) |\n")
+        f.write("|----------------|------------------------|------------------------|\n")
 
         for freq in sorted(stats["sync_stats"].keys()):
             result = stats["sync_stats"][str(freq)]
-            f.write(f"| {freq} | {result['mean_frequency']:.2f} | {result['std_frequency']:.2f} | {result['mean_deviation'] * 1000:.3f} | {result['std_deviation'] * 1000:.3f} |\n")
+            f.write(f"| {freq} | {result['mean_frequency']:.2f} |  {result['mean_deviation'] * 1000:.3f} | \n")
 
         f.write("\n")
 
         # Write asynchronous results
         f.write("## Asynchronous Results\n\n")
-        f.write("| Frequency (Hz) | Actual Frequency (Hz) | Std Dev Frequency (Hz) | Mean Deviation (ms) | Std Dev Deviation (ms) |\n")
-        f.write("|----------------|------------------------|------------------------|---------------------|------------------------|\n")
+        f.write("| Frequency (Hz) | Actual Frequency (Hz) | Mean Deviation (ms) | \n")
+        f.write("|----------------|------------------------|------------------------|\n")
 
         for freq in sorted(stats["async_stats"].keys()):
             result = stats["async_stats"][str(freq)]
-            f.write(f"| {freq} | {result['mean_frequency']:.2f} | {result['std_frequency']:.2f} | {result['mean_deviation'] * 1000:.3f} | {result['std_deviation'] * 1000:.3f} |\n")
+            f.write(f"| {freq} | {result['mean_frequency']:.2f} |  {result['mean_deviation'] * 1000:.3f} |\n")
 
 async def main():
     """Main function."""
