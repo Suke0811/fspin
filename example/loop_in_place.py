@@ -64,7 +64,7 @@ async def run_async_examples():
         # after 1sec it will exist.
         # if report is true, then report shows up
     # Report is generated automatically when report=True
-    # All other functiosn are the same as sync
+    # All other functions are the same as sync
 
 
 # Run both synchronous and asynchronous examples
