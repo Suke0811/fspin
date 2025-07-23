@@ -52,22 +52,22 @@ jobs:
           pip install -e .
 
       - name: Modify benchmark parameters
-        run: python benchmark\update_benchmark.py
+        run: python benchmark/update_benchmark.py
         env:
           TEST_DURATION: ${{ github.event.inputs.test_duration }}
           NUM_ITERATIONS: ${{ github.event.inputs.iterations }}
 
       - name: Run benchmark
-        run: python benchmark\benchmark.py
+        run: python benchmark/benchmark.py
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results-${{ matrix.os }}-python-${{ matrix.python-version }}
           path: |
-            benchmark\benchmark_results.json
-            benchmark\benchmark_stats.json
-            benchmark\benchmark_report.md
+            benchmark/benchmark_results.json
+            benchmark/benchmark_stats.json
+            benchmark/benchmark_report.md
 
   combine-reports:
     name: Combine benchmark reports

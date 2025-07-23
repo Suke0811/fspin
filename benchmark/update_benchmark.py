@@ -1,8 +1,12 @@
 import os
 import re
 
+# Get the directory where the script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+benchmark_path = os.path.join(script_dir, 'benchmark.py')
+
 # Read the benchmark.py file
-with open('benchmark.py', 'r') as f:
+with open(benchmark_path, 'r') as f:
     content = f.read()
 
 # Get environment variables with defaults
@@ -14,7 +18,7 @@ content = re.sub(r'TEST_DURATION = \d+', f'TEST_DURATION = {test_duration}', con
 content = re.sub(r'NUM_ITERATIONS = \d+', f'NUM_ITERATIONS = {num_iterations}', content)
 
 # Write the updated content back to the file
-with open('benchmark.py', 'w') as f:
+with open(benchmark_path, 'w') as f:
     f.write(content)
 
 print(f"Updated benchmark.py with TEST_DURATION={test_duration} and NUM_ITERATIONS={num_iterations}")
