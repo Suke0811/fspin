@@ -325,7 +325,6 @@ class RateControl:
             asyncio.Task: The created task.
         """
         self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
-        await self._task
         return self._task
 
     async def start_spinning_async_wrapper(self, func, condition_fn, *args, **kwargs):
