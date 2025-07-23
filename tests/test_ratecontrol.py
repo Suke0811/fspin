@@ -461,3 +461,255 @@ async def test_spin_decorator_fire_and_forget():
 
     # Clean up
     rc.stop_spinning()
+
+
+import asyncio
+import time
+import pytest
+import logging
+import sys
+import os
+import platform
+import warnings
+from statistics import mean, stdev
+
+from fspin.reporting import ReportLogger
+from fspin.rate_control import RateControl
+from fspin.decorators import spin
+from fspin.loop_context import loop
+
+# Test for uncovered code in decorators.py
+def test_sync_decorator_with_thread():
+    """Test the sync decorator with thread=True to cover that branch."""
+    calls = []
+
+    @spin(freq=100, thread=True, report=True)
+    def work():
+        calls.append(1)
+        time.sleep(0.01)
+
+    # Start spinning and let it run briefly
+    rc = work()
+    time.sleep(0.05)
+
+    # Stop spinning and check results
+    rc.stop_spinning()
+    assert len(calls) > 0, "Function was not called"
+    assert rc.mode == "sync-threaded", "Incorrect mode detected"
+
+# Test for uncovered code in loop_context.py
+def test_loop_context_with_exception():
+    """Test the loop context manager with an exception inside the context."""
+    calls = []
+
+    def work():
+        calls.append(1)
+
+    try:
+        with loop(work, freq=100, report=True) as lp:
+            time.sleep(0.01)
+            raise ValueError("Test exception")
+    except ValueError:
+        pass
+
+    # Verify the loop was stopped properly despite the exception
+    assert not lp.is_running(), "Loop should be stopped after context exit with exception"
+    assert len(calls) > 0, "Function was not called"
+
+# Test for uncovered code in reporting.py
+def test_report_logger_with_disabled_output():
+    """Test the ReportLogger with enabled=False to cover that branch."""
+    logger = ReportLogger(enabled=False)
+
+    # This should not produce any output
+    logger.output("This message should not be logged")
+
+    # Verify report generation still works
+    logger.generate_report(
+        freq=100, loop_duration=0.01, initial_duration=0.005,
+        total_duration=1.0, total_iterations=100, avg_frequency=99.5,
+        avg_function_duration=0.005, avg_loop_duration=0.01,
+        avg_deviation=0.0001, max_deviation=0.001, std_dev_deviation=0.0005,
+        deviations=[0.0001] * 100, exceptions=[], mode="sync-threaded"
+    )
+
+    assert logger.report_generated, "Report should be marked as generated"
+
+# Test for uncovered code in rate_control.py
+def test_rate_control_with_own_loop():
+    """Test RateControl creating its own event loop."""
+    # Save the current event loop
+    try:
+        old_loop = asyncio.get_event_loop()
+    except RuntimeError:
+        # No event loop in this thread
+        old_loop = None
+
+    # Close any existing event loop
+    if old_loop and not old_loop.is_closed():
+        old_loop.close()
+
+    # Create RateControl with is_coroutine=True, which should create its own loop
+    rc = RateControl(freq=100, is_coroutine=True)
+
+    # Verify the loop was created
+    assert rc._own_loop is not None, "RateControl should create its own event loop"
+
+    # Clean up
+    rc.stop_spinning()
+
+    # Restore the event loop if needed
+    if old_loop and not old_loop.is_closed():
+        asyncio.set_event_loop(old_loop)
+
+@pytest.mark.asyncio
+async def test_async_spin_with_cancelled_error():
+    """Test async spin with a CancelledError to cover that branch."""
+    calls = []
+
+    async def awork():
+        calls.append(1)
+        await asyncio.sleep(0.01)
+
+    # Create RateControl and start spinning
+    rc = RateControl(freq=100, is_coroutine=True, report=True)
+    task = await rc.start_spinning_async(awork, None)
+
+    # Let it run briefly
+    await asyncio.sleep(0.05)
+
+    # Cancel the task
+    task.cancel()
+
+    # Wait for the task to be cancelled
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+    # Verify the function was called and the report was generated
+    assert len(calls) > 0, "Function was not called"
+    assert rc.logger.report_generated, "Report should be generated after cancellation"
+
+@pytest.mark.asyncio
+async def test_start_spinning_async_wrapper_with_wait_false():
+    """Test start_spinning_async_wrapper with wait=False to cover that branch."""
+    calls = []
+
+    async def awork():
+        calls.append(1)
+        await asyncio.sleep(0.01)
+
+    # Create RateControl and start spinning with wait=False
+    rc = RateControl(freq=100, is_coroutine=True, report=True)
+    result = await rc.start_spinning_async_wrapper(awork, wait=False)
+
+    # Verify the result is a task
+    assert asyncio.isfuture(result), "Result should be a task when wait=False"
+
+    # Let it run briefly
+    await asyncio.sleep(0.05)
+
+    # Clean up
+    rc.stop_spinning()
+
+    # Verify the function was called
+    assert len(calls) > 0, "Function was not called"
+
+# Additional tests to improve coverage
+
+def test_create_histogram_with_single_bin():
+    """Test create_histogram with a single bin."""
+    logger = ReportLogger(enabled=True)
+    data = [0.001, 0.002, 0.003, 0.004, 0.005]
+    histogram = logger.create_histogram(data, bins=1)
+    # The data is converted to ms (multiplied by 1000), so the range is 1.0 - 5.0 ms
+    assert "1.000 - 5.000 ms" in histogram, "Histogram should contain the bin range"
+    assert "(5)" in histogram, "Histogram should show the count of values in the bin"
+
+def test_keyboard_interrupt_in_sync_spin():
+    """Test handling of KeyboardInterrupt in spin_sync."""
+    calls = []
+
+    def work():
+        calls.append(1)
+        # Simulate a KeyboardInterrupt
+        raise KeyboardInterrupt()
+
+    rc = RateControl(freq=100, is_coroutine=False, report=True)
+    rc.spin_sync(work, None)
+
+    # Verify the function was called and the KeyboardInterrupt was caught
+    assert len(calls) > 0, "Function was not called"
+    # If we got here without an uncaught KeyboardInterrupt, the test passes
+
+@pytest.mark.asyncio
+async def test_keyboard_interrupt_in_async_spin():
+    """Test handling of KeyboardInterrupt in spin_async."""
+    calls = []
+
+    async def awork():
+        calls.append(1)
+        # Simulate a KeyboardInterrupt
+        raise KeyboardInterrupt()
+
+    rc = RateControl(freq=100, is_coroutine=True, report=True)
+    await rc.spin_async(awork, None)
+
+    # Verify the function was called and the KeyboardInterrupt was caught
+    assert len(calls) > 0, "Function was not called"
+    # If we got here without an uncaught KeyboardInterrupt, the test passes
+
+def test_report_with_no_iterations():
+    """Test get_report with no iterations recorded."""
+    rc = RateControl(freq=100, is_coroutine=False, report=True)
+    # Don't run any iterations
+    report = rc.get_report()
+
+    # Verify the report is empty
+    assert report == {}, "Report should be empty when no iterations are recorded"
+
+def test_str_representation_with_no_report():
+    """Test __str__ with no report data."""
+    rc = RateControl(freq=100, is_coroutine=False, report=False)
+
+    # Get the string representation
+    str_repr = str(rc)
+
+    # Verify it contains the basic information
+    assert "RateControl Status" in str_repr, "String representation should contain status"
+    assert "Target Frequency" in str_repr, "String representation should contain frequency"
+    assert "Loop Duration" in str_repr, "String representation should contain loop duration"
+
+def test_async_with_non_coroutine():
+    """Test starting async spinning with a non-coroutine function."""
+    def work():
+        pass
+
+    rc = RateControl(freq=100, is_coroutine=True, report=False)
+
+    # This should raise a TypeError
+    with pytest.raises(TypeError, match="Expected a coroutine function for async mode"):
+        rc.start_spinning(work, None)
+
+def test_sync_with_coroutine():
+    """Test starting sync spinning with a coroutine function."""
+    async def awork():
+        await asyncio.sleep(0)
+
+    rc = RateControl(freq=100, is_coroutine=False, report=False)
+
+    # This should raise a TypeError
+    with pytest.raises(TypeError, match="Expected a regular function for sync mode"):
+        rc.start_spinning(awork, None)
+
+@pytest.mark.asyncio
+async def test_async_loop_with_regular_function():
+    """Test async loop context manager with a regular function."""
+    def work():
+        pass
+
+    # This should raise a TypeError
+    with pytest.raises(TypeError, match="For regular functions, use 'with loop"):
+        async with loop(work, freq=100) as _:
+            await asyncio.sleep(0.01)
