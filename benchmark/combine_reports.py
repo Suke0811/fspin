@@ -14,7 +14,7 @@ def create_unified_report(artifacts_dir, output_file, test_duration, iterations)
         iterations: Number of iterations for each test
     """
     # Find all stats files
-    stats_files = glob.glob(os.path.join(artifacts_dir, 'benchmark-results-*/benchmark/benchmark_stats.json'))
+    stats_files = glob.glob(os.path.join(artifacts_dir, 'benchmark-results-*/benchmark_stats.json'))
 
     if not stats_files:
         print(f"No benchmark_stats.json files found in {artifacts_dir}")
