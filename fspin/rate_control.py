@@ -68,13 +68,27 @@ class RateControl:
         self.exceptions = []
         self._own_loop = None
 
-        # Check if running async on Windows with high frequency
-        if is_coroutine and platform.system() == "Windows" and freq > 65:
-            warnings.warn(
-                f"Running async with frequency {freq}Hz on Windows may not achieve desired rate. "
-                f"Windows timer resolution limits async frequency to ~65Hz. Consider using sync mode.",
-                category=RuntimeWarning,
-            )
+        # Check if running async with high frequency based on OS
+        system = platform.system()
+        if is_coroutine:
+            if system == "Windows" and freq > 65:
+                warnings.warn(
+                    f"Running async with frequency {freq}Hz on Windows may not achieve desired rate. "
+                    f"Windows timer resolution limits async frequency to ~65Hz. Consider using sync mode.",
+                    category=RuntimeWarning,
+                )
+            elif system == "Linux" and freq > 925:
+                warnings.warn(
+                    f"Running async with frequency {freq}Hz on Linux may not achieve desired rate. "
+                    f"Linux timer resolution typically limits async frequency to ~925Hz. Consider using sync mode for higher frequencies.",
+                    category=RuntimeWarning,
+                )
+            elif system == "Darwin" and freq > 4000:  # Darwin is the system name for macOS
+                warnings.warn(
+                    f"Running async with frequency {freq}Hz on macOS may not achieve desired rate. "
+                    f"macOS timer resolution typically limits async frequency to ~4000Hz. Consider using sync mode for higher frequencies.",
+                    category=RuntimeWarning,
+                )
 
         if is_coroutine:
             try:

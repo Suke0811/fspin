@@ -104,18 +104,22 @@ See [the examples](example/README.md) for complete synchronous and asynchronous 
 
 ## Performance & Accuracy
 
-The RateControl library is designed to maintain a desired loop frequency by compensating for deviations. Here’s a summary of observed performance:
+The RateControl library is designed to maintain a desired loop frequency by compensating for deviations. Here's a summary of observed performance:
 
 - **Synchronous Mode:**  
-  - On both Windows and Linux, synchronous loops using `time.sleep()` can achieve high accuracy. For example, a loop targeting 1000 Hz reached an average of ~999.81 Hz with minimal deviations.
+  - Any loop frequency (10-10000 Hz) should be able to achieve high average loop precision (99.98-100%).
+  - On both Windows and Linux, synchronous loops using `time.sleep()` can achieve high accuracy. For example, a loop
+    targeting 1000 Hz reached an average of ~999.81 Hz with minimal deviations. 
 
 - **Asynchronous Mode:**  
   - Using `asyncio.sleep()`, asynchronous loops are more affected by OS-level timer resolutions.  
-  - **Windows:** Often limited by a timer granularity of around 15 ms, so a loop set to 500 Hz may only reach ~65 Hz.  
-  - **Linux:** Generally provides finer sleep resolution, allowing asynchronous loops to run closer to the target frequency.
+  - **Windows:** Often limited by a timer granularity of around 15 ms, so a loop set to 500 Hz may only reach ~65 Hz. The library will automatically warn you if you set a frequency higher than 65 Hz on Windows in async mode.
+  - **Linux/macOS:** Generally provides finer sleep resolution, allowing asynchronous loops to run closer to the target frequency. Linux can achieve ~925 Hz and macOS up to ~4000 Hz in async mode.
 
 - **Python Version Differences:**  
   - On **Windows** newer Python versions like 3.12 will have better accuracy due to different implementation of time.sleep
+
+For detailed benchmark results across different operating systems and Python versions, see our [comprehensive benchmark report](benchmark/unified_benchmark_report.md).
 
 
 ### Report Example
