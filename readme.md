@@ -37,13 +37,13 @@ function_to_loop() # this will be blocking, and start looping
 ### with Context-Manager
 ```python
 import time
-from fspin import loop
+from fspin import spin
 
 def heartbeat():
     print(f"Heartbeat at {time.strftime('%H:%M:%S')}")
 
 # Runs in background thread at 2Hz, auto-stops on exit, prints report
-with loop(heartbeat, freq=2, report=True, thread=True):
+with spin(heartbeat, freq=2, report=True, thread=True):
     time.sleep(5)  # keep the block alive for 5s
     print("exiting the loop")
 # automatically exit the loop after 5 sec
