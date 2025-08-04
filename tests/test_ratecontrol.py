@@ -5,6 +5,7 @@ import logging
 import pytest
 import sys
 import os
+import re
 
 from fspin.reporting import ReportLogger
 from fspin.rate_control import RateControl
@@ -376,7 +377,7 @@ def test_loop_type_error_with_coroutine():
         await asyncio.sleep(0)
 
     # This should raise TypeError because async_function is a coroutine
-    with pytest.raises(TypeError, match="For coroutine functions, use 'async with loop"):
+    with pytest.raises(TypeError, match=re.escape("For coroutine functions, use 'async with spin(...)' instead.")):
         with loop(async_function, freq=100):
             time.sleep(0.01)
 
@@ -710,6 +711,6 @@ async def test_async_loop_with_regular_function():
         pass
 
     # This should raise a TypeError
-    with pytest.raises(TypeError, match="For regular functions, use 'with loop"):
+    with pytest.raises(TypeError, match="For regular functions, use 'with spin(...)"):
         async with loop(work, freq=100) as _:
             await asyncio.sleep(0.01)
