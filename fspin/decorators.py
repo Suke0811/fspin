@@ -49,6 +49,9 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=True):
                     except asyncio.CancelledError:
                         # Task was cancelled, which is expected when condition is met
                         pass
+                    finally:
+                        # Ensure it's stopped after task completes
+                        rc.stop_spinning()
 
                 return rc
             return async_wrapper
@@ -56,7 +59,11 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=True):
             @wraps(func)
             def sync_wrapper(*args, **kwargs):
                 rc = RateControl(freq, is_coroutine=False, report=report, thread=thread)
-                rc.start_spinning(func, condition_fn, *args, **kwargs)
+                try:
+                    rc.start_spinning(func, condition_fn, *args, **kwargs)
+                finally:
+                    rc.stop_spinning()
                 return rc
+
             return sync_wrapper
     return decorator
