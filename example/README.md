@@ -8,9 +8,9 @@ This directory contains simple usage examples for **fspin**. Each example demons
 | `sync_manual.py`       | Use `rate` directly with a synchronous function.            |
 | `async_decorator.py`   | Run an async function with the `@spin` decorator, showing both blocking and non-blocking patterns. |
 | `async_manual.py`      | Use `rate` directly with an async function, showing both blocking and non-blocking patterns. |
-| `async_fire_and_forget.py` | Demonstrate the fire-and-forget pattern with both the `@spin` decorator and the `loop` context manager. |
-| `async_loop_context.py`| Use the `loop` context manager with async functions, showing auto-detection of coroutines and both blocking and non-blocking patterns. |
-| `loop_in_place.py`     | Use context manager `with loop(...):`.                      |
+| `async_fire_and_forget.py` | Demonstrate the fire-and-forget pattern with both the `@spin` decorator and the `spin` context manager. |
+| `async_loop_context.py`| Use the `spin` context manager with async functions, showing auto-detection of coroutines and both blocking and non-blocking patterns. |
+| `loop_in_place.py`     | Use context manager `with spin(...):`.                      |
 | `dynamic_frequency.py` | Change the loop frequency at runtime.                       |
 
 Run any example with `python <file>` to see the behaviour.
@@ -37,21 +37,21 @@ You can copy‑paste this section into a large language model to get help or qui
 - `thread` – if `True`, synchronous functions run in a background thread so the call immediately returns.
 - `wait` – for async functions, if `True` (default), awaits the task to completion (blocking); if `False`, returns immediately (fire-and-forget).
 
-### `loop`
+### `spin` (Context Manager)
 
 ```python
 # For synchronous functions
-with loop(func, freq, condition_fn=None, report=False, thread=True, **kwargs) as rc:
+with spin(func, freq, condition_fn=None, report=False, thread=True, **kwargs) as rc:
     ...
 
 # For asynchronous functions
-async with loop(async_func, freq, condition_fn=None, report=False, **kwargs) as rc:
+async with spin(async_func, freq, condition_fn=None, report=False, **kwargs) as rc:
     ...
 ```
 
 - Context manager that starts `func` looping on entry and automatically stops on exit.
 - Automatically detects if the function is a coroutine and uses the appropriate context manager.
-- Provides the same options as `spin` but runs in the background for synchronous functions.
+- For synchronous functions, runs in the background when `thread=True` (default).
 - The returned object `rc` is an instance of `RateControl` which can be queried or manually stopped.
 
 ### `rate` / `RateControl`

@@ -8,7 +8,7 @@ A small utility for running Python functions or coroutines at a fixed rate. It o
 ![Coverage](coverage.svg)
 
 ## Features
-- `loop()` context manager for scoped background loops
+- `spin()` context manager for scoped background loops
 - `@spin` decorator to easily loop sync or async functions
 - `rate` / `RateControl` class for manual control
 - Adjustable frequency at runtime
@@ -72,7 +72,7 @@ rc.stop_spinning()
 ### Async with Fire-and-Forget Pattern
 ```python
 import asyncio
-from fspin import spin, loop
+from fspin import spin
 
 # Using the @spin decorator with wait=False for fire-and-forget
 @spin(freq=10, report=True, wait=False)
@@ -87,13 +87,13 @@ async def main():
     await asyncio.sleep(1)  # Do other work
     rc.stop_spinning()  # Stop the background task when done
 
-# Using the loop context manager with wait=False
+# Using the spin context manager with wait=False
 async def another_task():
     print("Another background task")
     await asyncio.sleep(0.1)
 
 async def another_main():
-    async with loop(another_task, freq=10, report=True) as lp:
+    async with spin(another_task, freq=10, report=True) as sp:
         print("Context manager returned immediately")
         await asyncio.sleep(1)  # Do other work
     # Task is stopped when exiting the context
