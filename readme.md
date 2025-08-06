@@ -102,6 +102,10 @@ async def another_main():
 ### More Examples
 See [the examples](example/README.md) for complete synchronous and asynchronous demos.
 
+## Library Cheatsheet
+
+A [comprehensive cheatsheet](fspin_cheatsheet.md) is available for developers and LLMs to quickly understand how to use the fspin library correctly. The cheatsheet includes detailed API references, common use cases, best practices, and troubleshooting guidance.
+
 ## Performance & Accuracy
 
 The RateControl library is designed to maintain a desired loop frequency by compensating for deviations. Here's a summary of observed performance:
