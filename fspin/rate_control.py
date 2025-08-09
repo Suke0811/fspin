@@ -354,7 +354,7 @@ class RateControl:
         self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
         return self._task
 
-    async def start_spinning_async_wrapper(self, func, condition_fn=None, *, wait=True, **kwargs):
+    async def start_spinning_async_wrapper(self, func, condition_fn=None, *, wait=False, **kwargs):
         """
         Wrapper for start_spinning_async to be used with await.
 
@@ -362,7 +362,7 @@ class RateControl:
             func (callable): The coroutine function to execute at the specified frequency.
             condition_fn (callable, optional): Function returning True to continue spinning.
             wait (bool, optional): Whether to await the task (blocking) or return immediately
-                (fire-and-forget). Defaults to True (blocking).
+                (fire-and-forget). Defaults to False (fire-and-forget).
             **kwargs: Keyword arguments to pass to func.
 
         Returns:

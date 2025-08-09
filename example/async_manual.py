@@ -22,14 +22,14 @@ async def main_loop():
     await asyncio.sleep(0.1)  # Simulate some async work
 
 async def run_blocking():
-    print("\n--- Blocking mode (wait=True, default) ---")
+    print("\n--- Blocking mode (wait=True) ---")
 
     # Create a RateControl instance for async functions
     rc = rate(freq=2, is_coroutine=True, report=True)
 
-    # Start spinning with the default wait=True (blocking)
+    # Start spinning with wait=True (blocking)
     # This will wait until all iterations are complete
-    await rc.start_spinning_async_wrapper(main_loop, condition)
+    await rc.start_spinning_async_wrapper(main_loop, condition, wait=True)
 
     print(f"Completed {counter['count']} iterations")
     print("This line is executed after all iterations are complete")

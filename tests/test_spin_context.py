@@ -59,7 +59,7 @@ async def test_async_spin_decorator():
     def condition():
         return counter['count'] < 3
     
-    @spin(freq=10, condition_fn=condition, report=True)
+    @spin(freq=10, condition_fn=condition, report=True, wait=True)
     async def test_function():
         counter['count'] += 1
         await asyncio.sleep(0.01)

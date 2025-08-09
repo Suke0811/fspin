@@ -2,7 +2,7 @@ import asyncio
 from functools import wraps
 from .rate_control import RateControl
 
-def spin(freq, condition_fn=None, report=False, thread=False, wait=None):
+def spin(freq, condition_fn=None, report=False, thread=False, wait=False):
     """
     Decorator to run the decorated function at a specified frequency (Hz).
 
@@ -16,11 +16,11 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=None):
             Defaults to None (always continue).
         report (bool, optional): Enable performance reporting. Defaults to False.
         thread (bool, optional): Use threading for synchronous functions. Defaults to False.
-        wait (bool | None, optional):
+        wait (bool, optional):
             - For async functions: whether to await the task (blocking) or return immediately
-              (fire-and-forget). Defaults to True (blocking) when not provided.
+              (fire-and-forget). Defaults to False (fire-and-forget).
             - For sync functions with thread=True: whether to join the thread before returning
-              (i.e., block until completion). Defaults to False (fire-and-forget) when not provided.
+              (i.e., block until completion). Defaults to False (fire-and-forget).
 
     Returns:
         callable: A decorated function that will run at the specified frequency.
@@ -46,9 +46,7 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=None):
                 rc = RateControl(freq, is_coroutine=True, report=report, thread=thread)
                 task = await rc.start_spinning_async(func, condition_fn, *args, **kwargs)
 
-                # Default wait to True for async if not explicitly provided
-                _wait = True if wait is None else wait
-                if _wait:
+                if wait:
                     try:
                         await task
                     except asyncio.CancelledError:
@@ -64,12 +62,10 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=None):
             @wraps(func)
             def sync_wrapper(*args, **kwargs):
                 rc = RateControl(freq, is_coroutine=False, report=report, thread=thread)
-                # Default wait to False for sync if not explicitly provided
-                _wait = False if wait is None else wait
-                # Forward wait for sync threaded mode; if _wait=True it will join before returning
-                rc.start_spinning(func, condition_fn, *args, wait=_wait, **kwargs)
+                # Forward wait for sync threaded mode; if wait=True it will join before returning
+                rc.start_spinning(func, condition_fn, *args, wait=wait, **kwargs)
                 # If we waited (thread join or blocking mode), ensure stopped; otherwise leave running
-                if _wait or not thread:
+                if wait or not thread:
                     rc.stop_spinning()
                 return rc
 
