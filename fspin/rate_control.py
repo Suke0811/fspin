@@ -8,7 +8,6 @@ from statistics import mean, stdev
 import traceback
 from contextlib import contextmanager
 import logging
-import os
 import json
 from .reporting import ReportLogger
 
