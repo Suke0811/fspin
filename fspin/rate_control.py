@@ -312,18 +312,29 @@ class RateControl:
             condition_fn (callable, optional): Function returning True to continue spinning.
             *args: Positional arguments to pass to func.
             **kwargs: Keyword arguments to pass to func.
+                Recognized keyword-only options:
+                - wait (bool): If thread=True and wait=True, join the thread before returning.
+                  Defaults to False for backward compatibility.
 
         Returns:
             threading.Thread or None: The thread object if thread=True, None otherwise.
         """
+        # Backward-compatible way to accept a keyword-only 'wait' without changing signature
+        wait = kwargs.pop("wait", False)
+
         if self.thread:
             self._thread = threading.Thread(
                 target=self.spin_sync, args=(func, condition_fn) + args, kwargs=kwargs)
             self._thread.daemon = True
             self._thread.start()
+            if wait:
+                # Block until the spinning thread completes
+                self._thread.join()
             return self._thread
         else:
+            # Blocking mode: run in the current thread
             self.spin_sync(func, condition_fn, *args, **kwargs)
+            return None
 
     async def start_spinning_async(self, func, condition_fn, *args, **kwargs):
         """
@@ -341,7 +352,7 @@ class RateControl:
         self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
         return self._task
 
-    async def start_spinning_async_wrapper(self, func, condition_fn=None, *, wait=True, **kwargs):
+    async def start_spinning_async_wrapper(self, func, condition_fn=None, *, wait=False, **kwargs):
         """
         Wrapper for start_spinning_async to be used with await.
 
@@ -349,7 +360,7 @@ class RateControl:
             func (callable): The coroutine function to execute at the specified frequency.
             condition_fn (callable, optional): Function returning True to continue spinning.
             wait (bool, optional): Whether to await the task (blocking) or return immediately
-                (fire-and-forget). Defaults to True (blocking).
+                (fire-and-forget). Defaults to False (fire-and-forget).
             **kwargs: Keyword arguments to pass to func.
 
         Returns:
@@ -401,7 +412,10 @@ class RateControl:
                 self._task.cancel()
         else:
             if self._thread:
-                self._thread.join()
+                # Avoid deadlock if stop_spinning is called from within the worker thread
+                current = threading.current_thread()
+                if self._thread.is_alive() and current is not self._thread:
+                    self._thread.join()
         if self._own_loop is not None:
             self._own_loop.close()
             self._own_loop = None

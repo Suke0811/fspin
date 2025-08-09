@@ -16,8 +16,8 @@ def condition():
     # Continue until we have 5 iterations
     return counter['count'] < 5
 
-# Blocking version (wait=True, default)
-@spin(freq=2, condition_fn=condition, report=True)
+# Blocking version (wait=True)
+@spin(freq=2, condition_fn=condition, report=True, wait=True)
 async def blocking_loop():
     counter['count'] += 1
     print(f"Blocking decorator tick {counter['count']} at {time.strftime('%H:%M:%S')}")
@@ -31,7 +31,7 @@ async def non_blocking_loop():
     await asyncio.sleep(0.1)  # Simulate some async work
 
 async def run_blocking():
-    print("\n--- Blocking mode (wait=True, default) ---")
+    print("\n--- Blocking mode (wait=True) ---")
     # This will wait until all iterations are complete
     rc = await blocking_loop()
 

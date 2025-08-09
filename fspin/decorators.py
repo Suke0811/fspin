@@ -2,7 +2,7 @@ import asyncio
 from functools import wraps
 from .rate_control import RateControl
 
-def spin(freq, condition_fn=None, report=False, thread=False, wait=True):
+def spin(freq, condition_fn=None, report=False, thread=False, wait=False):
     """
     Decorator to run the decorated function at a specified frequency (Hz).
 
@@ -16,8 +16,11 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=True):
             Defaults to None (always continue).
         report (bool, optional): Enable performance reporting. Defaults to False.
         thread (bool, optional): Use threading for synchronous functions. Defaults to False.
-        wait (bool, optional): For async functions, whether to await the task (blocking)
-            or return immediately (fire-and-forget). Defaults to True (blocking).
+        wait (bool, optional):
+            - For async functions: whether to await the task (blocking) or return immediately
+              (fire-and-forget). Defaults to False (fire-and-forget).
+            - For sync functions with thread=True: whether to join the thread before returning
+              (i.e., block until completion). Defaults to False (fire-and-forget).
 
     Returns:
         callable: A decorated function that will run at the specified frequency.
@@ -59,9 +62,10 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=True):
             @wraps(func)
             def sync_wrapper(*args, **kwargs):
                 rc = RateControl(freq, is_coroutine=False, report=report, thread=thread)
-                try:
-                    rc.start_spinning(func, condition_fn, *args, **kwargs)
-                finally:
+                # Forward wait for sync threaded mode; if wait=True it will join before returning
+                rc.start_spinning(func, condition_fn, *args, wait=wait, **kwargs)
+                # If we waited (thread join or blocking mode), ensure stopped; otherwise leave running
+                if wait or not thread:
                     rc.stop_spinning()
                 return rc
 

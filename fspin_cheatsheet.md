@@ -23,7 +23,7 @@ The primary way to use fspin is through the `@spin` decorator, which automatical
 ```python
 from fspin import spin
 
-@spin(freq=10, condition_fn=None, report=False, thread=False, wait=True)
+@spin(freq=10, condition_fn=None, report=False, thread=False, wait=False)
 def my_function():
     # This will run at 10Hz (10 times per second)
     print("Hello")
@@ -79,14 +79,14 @@ rc.stop_spinning()
 ### `@spin` Decorator
 
 ```python
-@spin(freq, condition_fn=None, report=False, thread=False, wait=True)
+@spin(freq, condition_fn=None, report=False, thread=False, wait=False)
 ```
 
 - `freq` (float): Target frequency in Hz (cycles per second)
 - `condition_fn` (callable, optional): Function returning True to continue spinning, False to stop
 - `report` (bool): When True, performance statistics are recorded and printed
 - `thread` (bool): For sync functions, if True, runs in a background thread
-- `wait` (bool): For async functions, if True (default), awaits completion; if False, returns immediately
+- `wait` (bool): For async functions, if True, awaits completion; if False (default), returns immediately. For sync threaded functions, if True, joins the thread; default is False (fire-and-forget).
 
 Returns:
 - The decorated function returns a `RateControl` instance that can be used to control the spinning process

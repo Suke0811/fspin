@@ -47,7 +47,7 @@ class spin:
         ...     await asyncio.sleep(1)  # Do other work
         >>> # Task is stopped when exiting the context
     """
-    def __init__(self, func, freq, *, condition_fn=None, report=False, thread=True, **kwargs):
+    def __init__(self, func, freq, *, condition_fn=None, report=False, thread=True, wait=False, **kwargs):
         # Automatically detect if the function is a coroutine
         is_coroutine = asyncio.iscoroutinefunction(func)
 
@@ -56,12 +56,13 @@ class spin:
         self.condition_fn = condition_fn
         self.kwargs = kwargs
         self.is_coroutine = is_coroutine
+        self.wait = wait
 
     def __enter__(self):
         if self.is_coroutine:
             raise TypeError("For coroutine functions, use 'async with spin(...)' instead.")
 
-        self.rc.start_spinning(self.func, self.condition_fn, **self.kwargs)
+        self.rc.start_spinning(self.func, self.condition_fn, wait=self.wait, **self.kwargs)
         return self.rc
 
     def __exit__(self, exc_type, exc_val, exc_tb):

@@ -97,7 +97,7 @@ async def test_spin_async_counts():
         # Continue until we have at least 2 calls
         return len(calls) < 2
 
-    @spin(freq=100, condition_fn=condition, report=True)
+    @spin(freq=100, condition_fn=condition, report=True, wait=True)
     async def awork():
         calls.append(time.perf_counter())
         await asyncio.sleep(0.01)  # Small delay to ensure the function runs
@@ -204,7 +204,7 @@ async def test_spin_async_exception_handling(caplog):
     # We'll check for the exception message in the logs instead of using pytest.warns
     with caplog.at_level(logging.INFO, logger="root"):
         try:
-            await rc.start_spinning_async_wrapper(awork, cond)
+            await rc.start_spinning_async_wrapper(awork, cond, wait=True)
         except Exception as e:
             # If an exception is raised, that's fine - we're testing exception handling
             print(f"Exception raised: {e}")
@@ -355,7 +355,7 @@ async def test_automatic_report_generation_async():
         await asyncio.sleep(0.01)  # Small delay to ensure the function runs
 
     rc = RateControl(freq=100, is_coroutine=True, report=True)
-    await rc.start_spinning_async_wrapper(awork, condition)
+    await rc.start_spinning_async_wrapper(awork, condition, wait=True)
 
     # Verify that the function was called at least once
     assert len(calls) > 0, "Function was not called"
