@@ -10,7 +10,7 @@ A small utility for running Python functions or coroutines at a fixed rate. It o
 ---
 ## **Installation**
 Choose one of the following methods to install the package:
-To install the latest stable release using pip. [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
+To install the latest stable release, use pip: [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
 ```bash
 pip install fspin
 ```
