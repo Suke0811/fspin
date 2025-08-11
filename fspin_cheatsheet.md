@@ -23,15 +23,27 @@ The primary way to use fspin is through the `@spin` decorator, which automatical
 ```python
 from fspin import spin
 
-@spin(freq=10, condition_fn=None, report=False, thread=False, wait=False)
-def my_function():
-    # This will run at 10Hz (10 times per second)
+# Sync function examples
+@spin(freq=10, condition_fn=None, report=False, thread=True, wait=False)
+def my_function_non_blocking():
+    # Runs at 10Hz in a background thread and returns immediately (fire-and-forget)
     print("Hello")
 
-# For async functions
+@spin(freq=10, condition_fn=None, report=False, thread=True, wait=True)
+def my_function_blocking():
+    # Runs at 10Hz in a background thread but the call blocks until completion (thread join)
+    print("Hello")
+
+# Async function examples
 @spin(freq=5, report=True, wait=True)
-async def my_async_function():
-    # This will run at 5Hz
+async def my_async_function_blocking():
+    # Runs at 5Hz; awaiting the decorated function blocks until completion
+    print("Async hello")
+    await asyncio.sleep(0.01)
+
+@spin(freq=5, report=True, wait=False)
+async def my_async_function_non_blocking():
+    # Runs at 5Hz and returns immediately (fire-and-forget); remember to stop later
     print("Async hello")
     await asyncio.sleep(0.01)
 ```
@@ -41,13 +53,19 @@ async def my_async_function():
 The context manager provides a way to run a function at a specified frequency within a specific scope.
 
 ```python
-# For synchronous functions
-with spin(my_function, freq=10, report=True, thread=True) as rc:
-    # Function runs in the background at 10Hz
+# For synchronous functions (threaded, fire-and-forget)
+with spin(my_function, freq=10, report=True, thread=True, wait=False) as rc:
+    # Function runs in a background thread at 10Hz while inside the context
     time.sleep(1)  # Let it run for 1 second
 # Function stops when exiting the context
 
-# For asynchronous functions
+# For synchronous functions (threaded, blocking)
+# When wait=True, entering the with-body is delayed until the loop finishes.
+with spin(my_function, freq=10, report=True, thread=True, wait=True) as rc:
+    # By the time we get here, the loop has already completed.
+    pass
+
+# For asynchronous functions (always runs in background while inside the context)
 async with spin(my_async_function, freq=5, report=True) as rc:
     # Function runs in the background at 5Hz
     await asyncio.sleep(1)  # Let it run for 1 second
@@ -89,7 +107,7 @@ rc.stop_spinning()
 - `wait` (bool): For async functions, if True, awaits completion; if False (default), returns immediately. For sync threaded functions, if True, joins the thread; default is False (fire-and-forget).
 
 Returns:
-- The decorated function returns a `RateControl` instance that can be used to control the spinning process
+- The decorated function returns a `RateControl` instance. For async with `wait=False`, it returns immediately while running; for async with `wait=True`, it returns after completion (stopped). For sync with `thread=True, wait=False`, it returns immediately while running; with `wait=True` or `thread=False`, it returns after completion.
 
 ### `spin` Context Manager
 
@@ -110,6 +128,7 @@ async with spin(async_func, freq, condition_fn=None, report=False, **kwargs) as 
 - `condition_fn` (callable, optional): Function returning True to continue spinning
 - `report` (bool): When True, performance statistics are recorded and printed
 - `thread` (bool): For sync functions, if True (default), runs in a background thread
+- `wait` (bool, sync only): When `thread=True` and `wait=True`, entering the with-body is blocked until the loop completes (the internal thread is joined before returning). When `wait=False`, the body executes while the loop runs in the background. For async functions used with `async with`, `wait` is not applicable; the loop runs while inside the context and is stopped on exit.
 - `**kwargs`: Additional arguments to pass to the function
 
 Returns:
@@ -128,6 +147,9 @@ rc = rate(freq, is_coroutine=False, report=False, thread=True)
 
 Important methods:
 - `start_spinning(func, condition_fn=None, *args, **kwargs)`: Start the spinning process
+- `start_spinning_sync(func, condition_fn, *, wait=False, **kwargs)`: Sync start; if `thread=True` and `wait=True`, joins the thread before returning (blocking). If `thread=False`, runs in the current thread (blocking by definition).
+- `start_spinning_async(func, condition_fn, **kwargs)`: Async start; returns an asyncio.Task immediately (fire-and-forget).
+- `start_spinning_async_wrapper(func, condition_fn=None, *, wait=False, **kwargs)`: Async helper that can be `await`ed. If `wait=True`, it awaits the task to completion (blocking the caller coroutine) and returns the RateControl; otherwise returns the Task.
 - `stop_spinning()`: Stop the spinning process
 - `get_report(output=True)`: Generate and optionally print a performance report
 - `is_running()`: Check if the spinning process is running
@@ -138,6 +160,21 @@ Important properties:
 - `exception_count` (int): Number of exceptions raised during execution
 - `mode` (str): Current execution mode ("async", "sync-threaded", or "sync-blocking")
 - `status` (str): Current status ("running" or "stopped")
+
+### Blocking vs fire-and-forget (wait) quick reference
+
+- Sync + thread=True + wait=False:
+  - Starts a background thread and returns immediately (fire-and-forget). Use context manager or call `rc.stop_spinning()` to stop.
+- Sync + thread=True + wait=True:
+  - Starts a background thread but blocks the caller until the loop completes (internally joins the thread before returning). In a `with spin(..., wait=True)` context, the with-body executes only after completion.
+- Sync + thread=False:
+  - Always blocks in the current thread until completion (no background thread).
+- Async decorator with wait=False:
+  - `await decorated()` returns a RateControl immediately while the task continues running in the background. Remember to stop later.
+- Async decorator with wait=True:
+  - `await decorated()` awaits the internal task to completion and returns after it finishes.
+- Async context manager (async with spin(...)):
+  - Starts the task when entering the context, runs while inside, and stops on exit. The `wait` flag is not used here.
 
 ## Common Use Cases
 
@@ -187,6 +224,49 @@ await asyncio.sleep(3)
 
 # Clean up when done
 rc.stop_spinning()
+```
+
+### 3b. Synchronous threaded: blocking vs fire-and-forget
+
+```python
+counter = {"n": 0}
+
+def cond():
+    return counter["n"] < 5
+
+# Fire-and-forget: returns immediately while the background thread runs
+@spin(freq=50, condition_fn=cond, thread=True, wait=False)
+def sync_bg():
+    counter["n"] += 1
+
+rc = sync_bg()          # returns immediately
+# ... do other work ...
+rc.stop_spinning()      # stop when ready
+
+# Blocking: call does not return until cond() becomes False
+@spin(freq=50, condition_fn=cond, thread=True, wait=True)
+def sync_blocking():
+    counter["n"] += 1
+
+counter["n"] = 0
+rc2 = sync_blocking()   # blocks until 5 iterations complete
+```
+
+### 3c. Async manual: explicit blocking with wrapper
+
+```python
+rc = rate(freq=5, is_coroutine=True)
+
+async def work():
+    ...
+
+# Block until loop finishes
+await rc.start_spinning_async_wrapper(work, wait=True)
+# Returns the RateControl after completion
+
+# Or fire-and-forget
+task = await rc.start_spinning_async_wrapper(work, wait=False)
+# task is an asyncio.Task; remember to stop later with rc.stop_spinning()
 ```
 
 ### 4. Change frequency at runtime

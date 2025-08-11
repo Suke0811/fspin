@@ -7,6 +7,14 @@ A small utility for running Python functions or coroutines at a fixed rate. It o
 [![Tests](https://github.com/Suke0811/fspin/actions/workflows/ci.yml/badge.svg)](https://github.com/Suke0811/fspin/actions/workflows/ci.yml)
 ![Coverage](coverage.svg)
 
+---
+## **Installation**
+Choose one of the following methods to install the package:
+To install the latest stable release using pip. [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
+```bash
+pip install fspin
+````
+
 ## Features
 - `spin()` context manager for scoped background loops
 - `@spin` decorator to easily loop sync or async functions
@@ -16,17 +24,21 @@ A small utility for running Python functions or coroutines at a fixed rate. It o
 - Auto-detection of coroutines (no need to specify `is_async=True`)
 - Support for both blocking and fire-and-forget patterns for async functions
 
+## Library Cheatsheet
+A [comprehensive cheatsheet](fspin_cheatsheet.md) is available for developers and LLMs to quickly understand how to use the fspin library correctly. 
+The cheatsheet includes detailed API references, common use cases, best practices, and troubleshooting guidance. 
+Give this cheatsheet to your LLM, then it should be able to use and debug the library correctly.  
+
+
 ## Usage
 ```python
 import time
 from fspin import spin
 
-
 @spin(freq=1000, report=True)
 def function_to_loop():
   # things to loop
   time.sleep(0.0005) # a fake task to take 0.5ms
-
 
 # call the function
 function_to_loop() # this will be blocking, and start looping
@@ -68,7 +80,6 @@ time.sleep(3)
 rc.stop_spinning()
 ```
 
-
 ### Async with Fire-and-Forget Pattern
 ```python
 import asyncio
@@ -101,10 +112,6 @@ async def another_main():
 
 ### More Examples
 See [the examples](example/README.md) for complete synchronous and asynchronous demos.
-
-## Library Cheatsheet
-
-A [comprehensive cheatsheet](fspin_cheatsheet.md) is available for developers and LLMs to quickly understand how to use the fspin library correctly. The cheatsheet includes detailed API references, common use cases, best practices, and troubleshooting guidance.
 
 ## Performance & Accuracy
 
@@ -157,12 +164,3 @@ Distribution of Deviation from Desired Loop Duration (ms):
 ```
 
 
----
-## **Installation**
-Choose one of the following methods to install the package:
-
-### **1. Install from PyPI**
-To install the latest stable release using pip. [![PyPI Downloads](https://static.pepy.tech/badge/fspin)](https://pypi.org/project/fspin/)
-```bash
-pip install fspin
-````
