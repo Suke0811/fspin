@@ -3,6 +3,7 @@ import warnings
 import threading
 import asyncio
 import platform
+import inspect
 from functools import wraps
 from statistics import mean, stdev
 import traceback
@@ -124,20 +125,62 @@ class RateControl:
         # Always maintain deviation accumulator for loop compensation.
         self.deviation_accumulator = 0.0
 
-    def _prepare_condition_fn(self, condition_fn):
+    def _prepare_condition_fn(self, condition_fn, *, is_async):
         """
         Prepare the condition function, using a default if None is provided.
 
         Args:
-            condition_fn (callable, optional): Function returning True to continue spinning.
+            condition_fn (callable, optional): Regular predicate returning True to continue
+                spinning. Awaitable predicates are not supported in synchronous mode.
+            is_async (bool): Whether the calling context is asynchronous.
 
         Returns:
             callable: A function that returns True to continue spinning.
         """
+        if getattr(condition_fn, "_fspin_prepared_condition", False):
+            return condition_fn
+
+        def _mark_prepared(fn):
+            setattr(fn, "_fspin_prepared_condition", True)
+            return fn
+
         if condition_fn is None:
-            def condition_fn():
+            if is_async:
+                async def default_condition():
+                    return True
+
+                return _mark_prepared(default_condition)
+
+            def default_condition():
                 return True
-        return condition_fn
+
+            return _mark_prepared(default_condition)
+
+        if is_async:
+            if inspect.iscoroutinefunction(condition_fn):
+                async def async_condition():
+                    return bool(await condition_fn())
+
+                return _mark_prepared(async_condition)
+
+            async def async_condition():
+                result = condition_fn()
+                if inspect.isawaitable(result):
+                    result = await result
+                return bool(result)
+
+            return _mark_prepared(async_condition)
+
+        if inspect.iscoroutinefunction(condition_fn):
+            raise TypeError("Synchronous spinning does not support coroutine condition functions.")
+
+        def sync_condition():
+            result = condition_fn()
+            if inspect.isawaitable(result):
+                raise TypeError("Synchronous spinning does not support awaitable condition functions.")
+            return bool(result)
+
+        return _mark_prepared(sync_condition)
 
     def _handle_exception(self, e, func, is_coroutine=False):
         """
@@ -218,11 +261,12 @@ class RateControl:
 
         Args:
             func (callable): The function to execute at the specified frequency.
-            condition_fn (callable, optional): Function returning True to continue spinning.
+            condition_fn (callable, optional): Regular predicate returning True to continue
+                spinning. Awaitable predicates are not supported in synchronous mode.
             *args: Positional arguments to pass to func.
             **kwargs: Keyword arguments to pass to func.
         """
-        condition_fn = self._prepare_condition_fn(condition_fn)
+        condition_fn = self._prepare_condition_fn(condition_fn, is_async=False)
 
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
@@ -261,17 +305,18 @@ class RateControl:
 
         Args:
             func (callable): The coroutine function to execute at the specified frequency.
-            condition_fn (callable, optional): Function returning True to continue spinning.
+            condition_fn (callable or coroutine, optional): Predicate evaluated before each
+                iteration. Async predicates are awaited automatically.
             *args: Positional arguments to pass to func.
             **kwargs: Keyword arguments to pass to func.
         """
-        condition_fn = self._prepare_condition_fn(condition_fn)
+        condition_fn = self._prepare_condition_fn(condition_fn, is_async=True)
 
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
         first_iteration = True
         try:
-            while not self._stop_event.is_set() and condition_fn():
+            while not self._stop_event.is_set() and await condition_fn():
                 iteration_start = time.perf_counter()
                 try:
                     await func(*args, **kwargs)
@@ -309,7 +354,8 @@ class RateControl:
 
         Args:
             func (callable): The function to execute at the specified frequency.
-            condition_fn (callable, optional): Function returning True to continue spinning.
+            condition_fn (callable, optional): Regular predicate returning True to continue
+                spinning. Awaitable predicates are not supported in synchronous mode.
             *args: Positional arguments to pass to func.
             **kwargs: Keyword arguments to pass to func.
                 Recognized keyword-only options:
@@ -321,6 +367,8 @@ class RateControl:
         """
         # Backward-compatible way to accept a keyword-only 'wait' without changing signature
         wait = kwargs.pop("wait", False)
+
+        condition_fn = self._prepare_condition_fn(condition_fn, is_async=False)
 
         if self.thread:
             self._thread = threading.Thread(
@@ -342,13 +390,16 @@ class RateControl:
 
         Args:
             func (callable): The coroutine function to execute at the specified frequency.
-            condition_fn (callable, optional): Function returning True to continue spinning.
+            condition_fn (callable or coroutine, optional): Predicate evaluated before each
+                iteration. Async predicates are awaited automatically.
             *args: Positional arguments to pass to func.
             **kwargs: Keyword arguments to pass to func.
 
         Returns:
             asyncio.Task: The created task.
         """
+        condition_fn = self._prepare_condition_fn(condition_fn, is_async=True)
+
         self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
         return self._task
 
@@ -358,7 +409,8 @@ class RateControl:
 
         Args:
             func (callable): The coroutine function to execute at the specified frequency.
-            condition_fn (callable, optional): Function returning True to continue spinning.
+            condition_fn (callable or coroutine, optional): Predicate evaluated before each
+                iteration. Async predicates are awaited automatically.
             wait (bool, optional): Whether to await the task (blocking) or return immediately
                 (fire-and-forget). Defaults to False (fire-and-forget).
             **kwargs: Keyword arguments to pass to func.
@@ -383,7 +435,9 @@ class RateControl:
 
         Args:
             func (callable): The function or coroutine to execute at the specified frequency.
-            condition_fn (callable, optional): Function returning True to continue spinning.
+            condition_fn (callable or coroutine, optional): Predicate evaluated before each
+                iteration. Async predicates are awaited automatically; sync contexts require
+                a regular callable returning a truthy value.
             *args: Positional arguments to pass to func.
             **kwargs: Keyword arguments to pass to func.
 

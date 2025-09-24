@@ -18,10 +18,19 @@ class loop(spin):
     - For synchronous functions: `with loop(func, freq) as lp:`
     - For asynchronous functions: `async with loop(func, freq) as lp:`
     """
-    def __init__(self, func, freq, *, condition_fn=None, report=False, thread=True, **kwargs):
+    def __init__(self, func, freq, *func_args, condition_fn=None, report=False, thread=True, wait=False, **func_kwargs):
         warnings.warn(
             "The 'loop' context manager is deprecated. Use 'spin' instead.",
             DeprecationWarning,
             stacklevel=2
         )
-        super().__init__(func, freq, condition_fn=condition_fn, report=report, thread=thread, **kwargs)
+        super().__init__(
+            func,
+            freq,
+            *func_args,
+            condition_fn=condition_fn,
+            report=report,
+            thread=thread,
+            wait=wait,
+            **func_kwargs,
+        )

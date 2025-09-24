@@ -70,6 +70,10 @@ async with spin(my_async_function, freq=5, report=True) as rc:
     # Function runs in the background at 5Hz
     await asyncio.sleep(1)  # Let it run for 1 second
 # Function stops when exiting the context
+
+# Pass positional and keyword arguments to the worker each iteration
+with spin(my_function_with_args, 20, "reading", unit="°C"):
+    time.sleep(0.5)
 ```
 
 ### 3. `rate` / `RateControl` Class
@@ -101,7 +105,9 @@ rc.stop_spinning()
 ```
 
 - `freq` (float): Target frequency in Hz (cycles per second)
-- `condition_fn` (callable, optional): Function returning True to continue spinning, False to stop
+- `condition_fn` (callable or coroutine, optional): Predicate evaluated before each iteration. For synchronous functions it must
+  be a regular callable returning a truthy value. For async functions it may be a regular callable or coroutine; awaitable
+  results are awaited automatically.
 - `report` (bool): When True, performance statistics are recorded and printed
 - `thread` (bool): For sync functions, if True, runs in a background thread
 - `wait` (bool): For async functions, if True, awaits completion; if False (default), returns immediately. For sync threaded functions, if True, joins the thread; default is False (fire-and-forget).
@@ -113,23 +119,24 @@ Returns:
 
 ```python
 # For synchronous functions
-with spin(func, freq, condition_fn=None, report=False, thread=True, **kwargs) as rc:
+with spin(func, freq, *args, condition_fn=None, report=False, thread=True, wait=False, **kwargs) as rc:
     # rc is a RateControl instance
     ...
 
 # For asynchronous functions
-async with spin(async_func, freq, condition_fn=None, report=False, **kwargs) as rc:
+async with spin(async_func, freq, *args, condition_fn=None, report=False, **kwargs) as rc:
     # rc is a RateControl instance
     ...
 ```
 
 - `func` (callable): The function to execute at the specified frequency
 - `freq` (float): Target frequency in Hz
-- `condition_fn` (callable, optional): Function returning True to continue spinning
+- `*args` / `**kwargs`: Additional positional and keyword arguments forwarded to the worker
+- `condition_fn` (callable or coroutine, optional): Predicate evaluated before each iteration. Sync contexts require a regular
+  callable; async contexts accept coroutine/awaitable predicates that are awaited automatically.
 - `report` (bool): When True, performance statistics are recorded and printed
 - `thread` (bool): For sync functions, if True (default), runs in a background thread
 - `wait` (bool, sync only): When `thread=True` and `wait=True`, entering the with-body is blocked until the loop completes (the internal thread is joined before returning). When `wait=False`, the body executes while the loop runs in the background. For async functions used with `async with`, `wait` is not applicable; the loop runs while inside the context and is stopped on exit.
-- `**kwargs`: Additional arguments to pass to the function
 
 Returns:
 - A `RateControl` instance that can be used to control the spinning process
@@ -147,9 +154,9 @@ rc = rate(freq, is_coroutine=False, report=False, thread=True)
 
 Important methods:
 - `start_spinning(func, condition_fn=None, *args, **kwargs)`: Start the spinning process
-- `start_spinning_sync(func, condition_fn, *, wait=False, **kwargs)`: Sync start; if `thread=True` and `wait=True`, joins the thread before returning (blocking). If `thread=False`, runs in the current thread (blocking by definition).
-- `start_spinning_async(func, condition_fn, **kwargs)`: Async start; returns an asyncio.Task immediately (fire-and-forget).
-- `start_spinning_async_wrapper(func, condition_fn=None, *, wait=False, **kwargs)`: Async helper that can be `await`ed. If `wait=True`, it awaits the task to completion (blocking the caller coroutine) and returns the RateControl; otherwise returns the Task.
+- `start_spinning_sync(func, condition_fn, *, wait=False, **kwargs)`: Sync start; if `thread=True` and `wait=True`, joins the thread before returning (blocking). If `thread=False`, runs in the current thread (blocking by definition). The condition must be a regular callable.
+- `start_spinning_async(func, condition_fn, **kwargs)`: Async start; returns an asyncio.Task immediately (fire-and-forget). Async conditions (coroutines or other awaitables) are awaited before each iteration.
+- `start_spinning_async_wrapper(func, condition_fn=None, *, wait=False, **kwargs)`: Async helper that can be `await`ed. If `wait=True`, it awaits the task to completion (blocking the caller coroutine) and returns the RateControl; otherwise returns the Task. Async predicates are awaited automatically.
 - `stop_spinning()`: Stop the spinning process
 - `get_report(output=True)`: Generate and optionally print a performance report
 - `is_running()`: Check if the spinning process is running
@@ -205,6 +212,32 @@ def limited_loop():
 
 rc = limited_loop()  # Runs for 5 iterations then stops
 # Report is generated automatically when report=True
+```
+
+Async workflows can use coroutine predicates as well:
+
+```python
+import asyncio
+from fspin import spin
+
+state = {"events": [], "checks": 0}
+
+async def async_condition():
+    state["checks"] += 1
+    await asyncio.sleep(0)
+    return state["checks"] < 4
+
+@spin(freq=50, condition_fn=async_condition, wait=True)
+async def async_limited_loop():
+    state["events"].append("tick")
+
+async def main():
+    rc = await async_limited_loop()  # Stops once async_condition returns False
+    assert len(state["events"]) == 3
+    assert state["checks"] == 4
+    assert rc.status == "stopped"
+
+asyncio.run(main())
 ```
 
 ### 3. Run an async function in the background (fire-and-forget)

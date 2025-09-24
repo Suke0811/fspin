@@ -12,8 +12,11 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=False):
 
     Args:
         freq (float): Target frequency in Hz (cycles per second).
-        condition_fn (callable, optional): Function returning True to continue spinning.
-            Defaults to None (always continue).
+        condition_fn (callable or coroutine, optional): Predicate evaluated before each
+            iteration. For synchronous functions it must be a regular callable returning
+            a truthy value. For async functions it may be a regular callable or coroutine;
+            awaitable results are handled automatically. Defaults to None (always
+            continue).
         report (bool, optional): Enable performance reporting. Defaults to False.
         thread (bool, optional): Use threading for synchronous functions. Defaults to False.
         wait (bool, optional):
