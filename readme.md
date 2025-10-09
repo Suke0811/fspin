@@ -15,6 +15,14 @@ To install the latest stable release, use pip: [![PyPI Downloads](https://static
 pip install fspin
 ```
 
+### Development dependencies
+To run the test suite locally, install the development requirements which include the
+`pytest-asyncio` and `pytest-timeout` plugins used by the repository configuration:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 ## Features
 - `spin()` context manager for scoped background loops
 - `@spin` decorator to easily loop sync or async functions
@@ -110,11 +118,42 @@ with spin(heartbeat, freq=2, report=True, thread=True):
     print("exiting the loop")
 # automatically exit the loop after 5 sec
 print("Loop exited")
+
+# Pass positional/keyword arguments to the worker on every iteration
+def log_value(value, *, prefix):
+    print(f"{prefix}: {value}")
+
+with spin(log_value, 5, 42, prefix="reading"):
+    time.sleep(1)
 ```
 
 Note:
 - For synchronous functions with threading, pass `wait=True` to block entering the with-body until the loop completes (the internal thread is joined before returning). With `wait=False` (default here), the loop runs in the background while inside the context.
 - For asynchronous functions used with `async with`, the `wait` flag is not used; the task runs while inside the context and stops on exit.
+- Synchronous contexts require `condition_fn` to be a regular callable returning a truthy value. For async contexts you can supply a coroutine function or other awaitable predicate—fspin will await it automatically before each iteration.
+
+### Async predicates for condition_fn
+```python
+import asyncio
+from fspin import spin
+
+ticks = []
+
+async def predicate():
+    await asyncio.sleep(0)  # simulate async state checks
+    return len(ticks) < 3
+
+@spin(freq=100, condition_fn=predicate, wait=True)
+async def monitored_task():
+    ticks.append("tick")
+
+async def main():
+    rc = await monitored_task()
+    assert len(ticks) == 2
+    assert rc.status == "stopped"
+
+asyncio.run(main())
+```
 
 ### Using Rate Class directly
 ```python
