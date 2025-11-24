@@ -563,6 +563,40 @@ def test_rate_control_with_own_loop():
     if old_loop and not old_loop.is_closed():
         asyncio.set_event_loop(old_loop)
 
+
+def test_start_spinning_async_with_auto_loop_thread():
+    """Ensure an auto-created event loop can schedule async spinning without a running loop."""
+
+    # Ensure there's no active loop to start with
+    try:
+        existing_loop = asyncio.get_event_loop()
+    except RuntimeError:
+        existing_loop = None
+
+    if existing_loop and not existing_loop.is_closed():
+        existing_loop.close()
+
+    rc = RateControl(freq=50, is_coroutine=True)
+    calls = []
+
+    async def awork():
+        calls.append(1)
+        await asyncio.sleep(0)
+
+    async def condition():
+        return len(calls) < 2
+
+    # Should not raise even though no loop is running
+    task = rc.start_spinning_async(awork, condition)
+
+    time.sleep(0.2)
+    rc.stop_spinning()
+
+    assert len(calls) > 0, "Async work should have been scheduled on the auto loop"
+    assert task is not None
+    if rc._loop_thread is not None:
+        assert not rc._loop_thread.is_alive(), "Loop thread should be stopped after cleanup"
+
 @pytest.mark.asyncio
 async def test_async_spin_with_cancelled_error():
     """Test async spin with a CancelledError to cover that branch."""

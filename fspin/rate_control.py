@@ -68,6 +68,7 @@ class RateControl:
         self.thread = thread
         self.exceptions = []
         self._own_loop = None
+        self._loop_thread = None
 
         # Check if running async with high frequency based on OS
         system = platform.system()
@@ -384,7 +385,7 @@ class RateControl:
             self.spin_sync(func, condition_fn, *args, **kwargs)
             return None
 
-    async def start_spinning_async(self, func, condition_fn, *args, **kwargs):
+    def start_spinning_async(self, func, condition_fn, *args, **kwargs):
         """
         Starts spinning asynchronously as an asyncio Task.
 
@@ -399,8 +400,24 @@ class RateControl:
             asyncio.Task: The created task.
         """
         condition_fn = self._prepare_condition_fn(condition_fn, is_async=True)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop: use the auto-created loop if available
+            if self._own_loop is None:
+                raise
 
-        self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
+            if not self._own_loop.is_running():
+                self._loop_thread = threading.Thread(target=self._own_loop.run_forever, daemon=True)
+                self._loop_thread.start()
+
+            future = asyncio.run_coroutine_threadsafe(
+                self.spin_async(func, condition_fn, *args, **kwargs), self._own_loop
+            )
+            self._task = asyncio.wrap_future(future, loop=self._own_loop)
+        else:
+            self._task = loop.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
+
         return self._task
 
     async def start_spinning_async_wrapper(self, func, condition_fn=None, *, wait=False, **kwargs):
@@ -460,7 +477,10 @@ class RateControl:
         """
         Signals the spinning loop to stop.
         """
-        self._stop_event.set()
+        if self.is_coroutine and self._own_loop is not None and self._own_loop.is_running():
+            self._own_loop.call_soon_threadsafe(self._stop_event.set)
+        else:
+            self._stop_event.set()
         if self.is_coroutine:
             if self._task:
                 self._task.cancel()
@@ -471,8 +491,13 @@ class RateControl:
                 if self._thread.is_alive() and current is not self._thread:
                     self._thread.join()
         if self._own_loop is not None:
+            if self._own_loop.is_running():
+                self._own_loop.call_soon_threadsafe(self._own_loop.stop)
+                if self._loop_thread is not None:
+                    self._loop_thread.join()
             self._own_loop.close()
             self._own_loop = None
+            self._loop_thread = None
 
     def get_report(self, output=True):
         """
