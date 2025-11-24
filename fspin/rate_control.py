@@ -456,23 +456,53 @@ class RateControl:
                 raise TypeError("Expected a regular function for sync mode.")
             return self.start_spinning_sync(func, condition_fn, *args, **kwargs)
 
+    def _close_own_loop(self):
+        if self._own_loop is not None:
+            self._own_loop.close()
+            self._own_loop = None
+
+    def _stop_thread(self):
+        if self._thread:
+            # Avoid deadlock if stop_spinning is called from within the worker thread
+            current = threading.current_thread()
+            if self._thread.is_alive() and current is not self._thread:
+                self._thread.join()
+
+    async def _cancel_task(self):
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+
+    async def stop_spinning_async(self):
+        """
+        Signals the spinning loop to stop and awaits async cleanup.
+        """
+        self._stop_event.set()
+        if self.is_coroutine:
+            await self._cancel_task()
+        else:
+            self._stop_thread()
+        self._close_own_loop()
+
     def stop_spinning(self):
         """
         Signals the spinning loop to stop.
         """
-        self._stop_event.set()
         if self.is_coroutine:
-            if self._task:
-                self._task.cancel()
-        else:
-            if self._thread:
-                # Avoid deadlock if stop_spinning is called from within the worker thread
-                current = threading.current_thread()
-                if self._thread.is_alive() and current is not self._thread:
-                    self._thread.join()
-        if self._own_loop is not None:
-            self._own_loop.close()
-            self._own_loop = None
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                asyncio.run(self.stop_spinning_async())
+            else:
+                loop.create_task(self.stop_spinning_async())
+            return
+
+        self._stop_event.set()
+        self._stop_thread()
+        self._close_own_loop()
 
     def get_report(self, output=True):
         """

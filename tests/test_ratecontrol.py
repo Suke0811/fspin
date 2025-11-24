@@ -10,6 +10,7 @@ import re
 from fspin.reporting import ReportLogger
 from fspin.rate_control import RateControl
 from fspin.decorators import spin
+from fspin.spin_context import spin as spin_context
 from fspin.loop_context import loop
 
 def test_create_histogram():
@@ -170,8 +171,7 @@ async def test_stop_spinning_async_task_cancel():
     await asyncio.sleep(0.05)
 
     # Stop the task and wait for it to be cancelled
-    rc.stop_spinning()
-    await asyncio.sleep(0.05)
+    await rc.stop_spinning_async()
 
     # Check if the task is done (it might be cancelled or completed)
     assert rc._task.done(), "Task is not done after stop_spinning"
@@ -186,6 +186,24 @@ async def test_stop_spinning_async_task_cancel():
             print(f"Task raised an exception: {e}")
             # If the task raised an exception other than CancelledError, that's fine too
             pass
+
+
+@pytest.mark.asyncio
+async def test_async_context_manager_waits_for_cleanup():
+    cleanup_called = asyncio.Event()
+
+    async def awork():
+        try:
+            while True:
+                await asyncio.sleep(0.01)
+        finally:
+            cleanup_called.set()
+
+    async with spin_context(awork, freq=100) as rc:
+        await asyncio.sleep(0.03)
+
+    await asyncio.wait_for(cleanup_called.wait(), timeout=0.5)
+    assert rc._task.done()
 
 
 @pytest.mark.asyncio

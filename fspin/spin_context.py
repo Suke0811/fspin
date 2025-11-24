@@ -90,4 +90,4 @@ class spin:
         return self.rc
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self.rc.stop_spinning()
+        await self.rc.stop_spinning_async()
