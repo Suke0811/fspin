@@ -484,13 +484,15 @@ class RateControl:
         Returns:
             dict: Performance statistics as a dictionary.
         """
-        if not self.report or not self.iteration_times:
+        if not self.report or (not self.iteration_times and self.initial_duration is None):
             self.logger.output("No iterations were recorded.")
             return {}
 
         end_time = self.end_time or time.perf_counter()
         total_duration = end_time - self.start_time
         total_iterations = len(self.iteration_times)
+        if self.initial_duration is not None:
+            total_iterations += 1
         avg_function_duration = mean(self.iteration_times) if self.iteration_times else 0
         avg_deviation = mean(self.deviations) if self.deviations else 0
         max_deviation = max(self.deviations) if self.deviations else 0
