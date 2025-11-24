@@ -76,6 +76,22 @@ def test_spin_sync_counts():
     assert len(rc.iteration_times) == 1
 
 
+def test_spin_sync_report_counts_warmup_iteration():
+    calls = []
+
+    def condition():
+        return len(calls) < 2
+
+    @spin(freq=1000, condition_fn=condition, report=True, thread=False)
+    def work():
+        calls.append(time.perf_counter())
+
+    rc = work()
+    report = rc.get_report(output=False)
+
+    assert report.get("total_iterations") == len(calls)
+
+
 def test_spin_sync_default_condition():
     calls = []
 
