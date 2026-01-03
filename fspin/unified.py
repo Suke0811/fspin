@@ -1,5 +1,6 @@
-import inspect
+﻿import inspect
 import asyncio
+import os
 from functools import wraps
 from .rate_control import RateControl
 from .decorators import spin as spin_decorator
@@ -7,20 +8,36 @@ from .spin_context import spin as spin_context_manager
 
 class UnifiedSpin:
     """
-    Unified entry point for fspin that intelligently selects between decorator,
-    context manager, or direct class usage based on how it's called.
-
+    Unified entry point for fspin.
+    
+    Acts as a decorator, context manager, or functional interface 
+    based on how it is called.
+    
     Usage:
-        # As a decorator
-        @spin(freq=10)
-        def my_function():
-            pass
-
-        # As a context manager
-        with spin(my_function, freq=10):
-            # Code to run while function is spinning
-            pass
+        @spin(freq=10, condition_fn=lambda: True)
+        def my_func(): ...
+        
+        with spin(my_func, freq=10):
+            ...
     """
+
+    def __init__(self):
+        # Dynamically load the cheatsheet into the docstring if available
+        try:
+            # Look for fspin_cheatsheet.md in the package directory or one level up
+            base_dir = os.path.dirname(os.path.dirname(__file__))
+            cheatsheet_path = os.path.join(base_dir, "fspin_cheatsheet.md")
+            if not os.path.exists(cheatsheet_path):
+                # Try sibling directory (if installed)
+                base_dir = os.path.dirname(__file__)
+                cheatsheet_path = os.path.join(base_dir, "fspin_cheatsheet.md")
+
+            if os.path.exists(cheatsheet_path):
+                with open(cheatsheet_path, "r", encoding="utf-8") as f:
+                    cheatsheet_content = f.read()
+                    self.__class__.__doc__ = (self.__class__.__doc__ or "") + "\n\n" + cheatsheet_content
+        except Exception:
+            pass
 
     def __call__(self, *args, **kwargs):
         # Determine how spin is being called
