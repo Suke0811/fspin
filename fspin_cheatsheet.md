@@ -8,6 +8,7 @@ fspin is a Python library for running functions at a specified frequency (rate c
 
 - Run functions at a specified frequency (Hz)
 - Support for both synchronous and asynchronous functions
+- Lambda support for condition functions
 - Automatic detection of function type (sync vs async)
 - Multiple execution modes: blocking, threaded, and fire-and-forget
 - Performance reporting and statistics
@@ -50,30 +51,28 @@ async def my_async_function_non_blocking():
 
 ### 2. `spin` Context Manager
 
-The context manager provides a way to run a function at a specified frequency within a specific scope.
+The context manager provides a way to run a function at a specified frequency within a specific scope. Using lambdas for the condition function is preferred for simple logic.
 
 ```python
 # For synchronous functions (threaded, fire-and-forget)
-with spin(my_function, freq=10, report=True, thread=True, wait=False) as rc:
-    # Function runs in a background thread at 10Hz while inside the context
-    time.sleep(1)  # Let it run for 1 second
-# Function stops when exiting the context
+# Preferred usage with lambda condition
+count = 0
+with spin(my_function, freq=10, condition_fn=lambda: count < 5) as rc:
+    while rc.is_running():
+        count += 1
+        time.sleep(0.1)
 
 # For synchronous functions (threaded, blocking)
 # When wait=True, entering the with-body is delayed until the loop finishes.
-with spin(my_function, freq=10, report=True, thread=True, wait=True) as rc:
+with spin(my_function, freq=10, thread=True, wait=True, condition_fn=lambda: count < 10) as rc:
     # By the time we get here, the loop has already completed.
     pass
 
 # For asynchronous functions (always runs in background while inside the context)
-async with spin(my_async_function, freq=5, report=True) as rc:
+async with spin(my_async_function, freq=5, condition_fn=lambda: count < 15) as rc:
     # Function runs in the background at 5Hz
     await asyncio.sleep(1)  # Let it run for 1 second
-# Function stops when exiting the context
-
-# Pass positional and keyword arguments to the worker each iteration
-with spin(my_function_with_args, 20, "reading", unit="°C"):
-    time.sleep(0.5)
+# Function stops when exiting the context or when condition becomes False
 ```
 
 ### 3. `rate` / `RateControl` Class
@@ -197,44 +196,39 @@ time.sleep(5)     # Let it run for 5 seconds
 rc.stop_spinning()  # Stop the function
 ```
 
-### 2. Run a function until a condition is met
+### 2. Run a function until a condition is met (Prefer Lambdas)
 
 ```python
-counter = {'count': 0}
+counter = 0
 
-def condition():
-    return counter['count'] < 5  # Stop after 5 iterations
-
-@spin(freq=2, condition_fn=condition, report=True)
+# Using a lambda function as a condition (Preferred)
+@spin(freq=2, condition_fn=lambda: counter < 5, report=True)
 def limited_loop():
-    counter['count'] += 1
-    print(f"Iteration {counter['count']}")
+    nonlocal counter
+    counter += 1
+    print(f"Iteration {counter}")
 
 rc = limited_loop()  # Runs for 5 iterations then stops
 # Report is generated automatically when report=True
 ```
 
-Async workflows can use coroutine predicates as well:
+Async workflows can use lambda predicates as well:
 
 ```python
 import asyncio
 from fspin import spin
 
-state = {"events": [], "checks": 0}
+count = 0
 
-async def async_condition():
-    state["checks"] += 1
-    await asyncio.sleep(0)
-    return state["checks"] < 4
-
-@spin(freq=50, condition_fn=async_condition, wait=True)
+@spin(freq=50, condition_fn=lambda: count < 4, wait=True)
 async def async_limited_loop():
-    state["events"].append("tick")
+    nonlocal count
+    count += 1
+    print(f"Async tick {count}")
 
 async def main():
-    rc = await async_limited_loop()  # Stops once async_condition returns False
-    assert len(state["events"]) == 3
-    assert state["checks"] == 4
+    rc = await async_limited_loop()  # Stops once count reaches 4
+    assert count == 4
     assert rc.status == "stopped"
 
 asyncio.run(main())
@@ -358,7 +352,14 @@ with spin(heartbeat, freq=5, report=True) as rc:
 - Ensure you use asynchronous functions with `is_coroutine=True`
 - The library will raise TypeError if there's a mismatch
 
-### 6. Context manager syntax
+### 6. Prefer Lambda Functions for Conditions
+
+- Use lambda functions for simple `condition_fn` logic to keep code concise.
+- Example: `condition_fn=lambda: counter < 10`
+- **Named functions and coroutines** are also supported and recommended for more complex state checks that don't fit in a single line.
+- Remember to use `nonlocal` if the lambda or inner function checks a variable modified inside the looped function.
+
+### 7. Context manager syntax
 
 - For synchronous functions: Use `with spin(...)`
 - For asynchronous functions: Use `async with spin(...)`

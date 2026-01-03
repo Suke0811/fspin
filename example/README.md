@@ -12,6 +12,7 @@ This directory contains simple usage examples for **fspin**. Each example demons
 | `async_loop_context.py`| Use the `spin` context manager with async functions, showing auto-detection of coroutines and both blocking and non-blocking patterns. |
 | `loop_in_place.py`     | Use context manager `with spin(...):`.                      |
 | `dynamic_frequency.py` | Change the loop frequency at runtime.                       |
+| `lambda_condition.py`  | Use a lambda function as a condition to stop the loop.      |
 
 Run any example with `python <file>` to see the behaviour.
 

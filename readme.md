@@ -41,18 +41,18 @@ Give this cheatsheet to your LLM, then it should be able to use and debug the li
 
 ## Usage
 ```python
-import time
 from fspin import spin
 
-@spin(freq=1000, report=True)
-def function_to_loop():
-  # things to loop
-  time.sleep(0.0005) # a fake task to take 0.5ms
+counter = 0
 
-# call the function
-function_to_loop() # this will be blocking, and start looping
-# it'll automatically catch the keyboard interrupt
-# we have async version too
+# Using a lambda function as a condition (Preferred)
+@spin(freq=10, condition_fn=lambda: counter < 5)
+def my_loop():
+    nonlocal counter
+    counter += 1
+    print(f"Iteration {counter}")
+
+my_loop() # Blocks until counter reaches 5
 ```
 
 ### Sync threaded: blocking vs fire-and-forget
@@ -60,26 +60,25 @@ function_to_loop() # this will be blocking, and start looping
 import time
 from fspin import spin
 
-counter = {"n": 0}
-
-def cond():
-    return counter["n"] < 5
+counter = 0
 
 # Fire-and-forget: returns immediately while the background thread runs
-@spin(freq=50, condition_fn=cond, thread=True, wait=False)
+@spin(freq=50, condition_fn=lambda: counter < 5, thread=True, wait=False)
 def sync_bg():
-    counter["n"] += 1
+    nonlocal counter
+    counter += 1
 
 rc = sync_bg()          # returns immediately
 # ... do other work ...
 rc.stop_spinning()      # stop when ready
 
-# Blocking: call does not return until cond() becomes False
-@spin(freq=50, condition_fn=cond, thread=True, wait=True)
+# Blocking: call does not return until condition becomes False
+@spin(freq=50, condition_fn=lambda: counter < 5, thread=True, wait=True)
 def sync_blocking():
-    counter["n"] += 1
+    nonlocal counter
+    counter += 1
 
-counter["n"] = 0
+counter = 0
 rc2 = sync_blocking()   # blocks until 5 iterations complete
 ```
 
@@ -109,47 +108,51 @@ async def run_both():
 import time
 from fspin import spin
 
-def heartbeat():
-    print(f"Heartbeat at {time.strftime('%H:%M:%S')}")
+counter = 0
 
-# Runs in background thread at 2Hz, auto-stops on exit, prints report
-with spin(heartbeat, freq=2, report=True, thread=True):
-    time.sleep(5)  # keep the block alive for 5s
-    print("exiting the loop")
-# automatically exit the loop after 5 sec
-print("Loop exited")
+# Runs in background thread as long as counter < 5
+# condition_fn uses a lambda for concise state checking
+with spin(lambda: print("Beat"), freq=10, condition_fn=lambda: counter < 5) as rc:
+    while rc.is_running():
+        counter += 1
+        time.sleep(0.1)
 
-# Pass positional/keyword arguments to the worker on every iteration
-def log_value(value, *, prefix):
-    print(f"{prefix}: {value}")
-
-with spin(log_value, 5, 42, prefix="reading"):
-    time.sleep(1)
+print(f"Loop stopped at counter={counter}")
 ```
 
 Note:
 - For synchronous functions with threading, pass `wait=True` to block entering the with-body until the loop completes (the internal thread is joined before returning). With `wait=False` (default here), the loop runs in the background while inside the context.
 - For asynchronous functions used with `async with`, the `wait` flag is not used; the task runs while inside the context and stops on exit.
-- Synchronous contexts require `condition_fn` to be a regular callable returning a truthy value. For async contexts you can supply a coroutine function or other awaitable predicate—fspin will await it automatically before each iteration.
+- Using a lambda for `condition_fn` is the preferred way to define simple stop conditions.
+- Named functions and coroutines are also fully supported for more complex logic:
+  ```python
+  def complex_condition():
+      # logic involving multiple variables or state
+      return some_state.is_valid and counter < 10
+
+  @spin(freq=10, condition_fn=complex_condition)
+  def my_loop():
+      ...
+  ```
+- Synchronous contexts require it to be a regular callable. For async contexts you can supply a coroutine or other awaitable predicate—fspin will await it automatically.
 
 ### Async predicates for condition_fn
 ```python
 import asyncio
 from fspin import spin
 
-ticks = []
+count = 0
 
-async def predicate():
-    await asyncio.sleep(0)  # simulate async state checks
-    return len(ticks) < 3
-
-@spin(freq=100, condition_fn=predicate, wait=True)
+# Async workflow using a lambda for the condition
+@spin(freq=100, condition_fn=lambda: count < 3, wait=True)
 async def monitored_task():
-    ticks.append("tick")
+    nonlocal count
+    count += 1
+    print(f"Tick {count}")
 
 async def main():
     rc = await monitored_task()
-    assert len(ticks) == 2
+    assert count == 3
     assert rc.status == "stopped"
 
 asyncio.run(main())
