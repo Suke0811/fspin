@@ -34,18 +34,27 @@ class spin:
         RateControl: The RateControl instance managing the spinning.
 
     Example:
+        >>> counter = 0
         >>> def heartbeat():
+        ...     nonlocal counter
+        ...     counter += 1
         ...     print("Beat")
-        >>> with spin(heartbeat, freq=5, report=True) as sp:
-        ...     time.sleep(1)  # Let it run for 1 second
-        >>> # Automatically stops spinning when exiting the context
+        >>> # Preferred usage with lambda condition
+        >>> with spin(heartbeat, freq=5, condition_fn=lambda: counter < 5) as sp:
+        ...     while sp.is_running():
+        ...         time.sleep(0.1)
+        >>> # Automatically stops spinning when counter reaching 5 or exiting the context
 
+        >>> count = 0
         >>> async def async_heartbeat():
+        ...     nonlocal count
+        ...     count += 1
         ...     print("Async Beat")
         ...     await asyncio.sleep(0)
-        >>> async with spin(async_heartbeat, freq=5, report=True) as sp:
-        ...     await asyncio.sleep(1)  # Let it run for 1 second
-        >>> # Automatically stops spinning when exiting the context
+        >>> # Preferred usage with lambda condition
+        >>> async with spin(async_heartbeat, freq=5, condition_fn=lambda: count < 5) as sp:
+        ...     await asyncio.sleep(1)  # Let it run
+        >>> # Automatically stops spinning when count reaching 5 or exiting the context
 
         >>> async def background_task():
         ...     print("Running in the background")
