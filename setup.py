@@ -32,6 +32,7 @@ setup(
     },
     license='MIT',
     packages=find_packages(include=[PACKAGE_NAME, PACKAGE_NAME + '.*']),
+    include_package_data=True,
     install_requires=requirements,
     classifiers=CLASSIFIERS,
     python_requires=PYTHON_REQUIRES,
