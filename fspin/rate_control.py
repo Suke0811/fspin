@@ -108,7 +108,9 @@ class RateControl:
                     asyncio.set_event_loop(loop)
                     loop.run_forever()
                 
-                self._loop_thread = threading.Thread(target=run_loop, args=(lp,), daemon=True)
+                self._loop_thread = threading.Thread(
+                    target=run_loop, args=(lp,), daemon=True, name="RateControlLoopThread"
+                )
                 self._loop_thread.start()
                 
             self._stop_event: Union[asyncio.Event, threading.Event, None] = None
@@ -394,7 +396,11 @@ class RateControl:
 
         if self.thread:
             self._thread = threading.Thread(
-                target=self.spin_sync, args=(func, condition_fn) + args, kwargs=kwargs)
+                target=self.spin_sync, 
+                args=(func, condition_fn) + args, 
+                kwargs=kwargs,
+                name="RateControlWorkerThread"
+            )
             self._thread.daemon = True
             self._thread.start()
             if wait:

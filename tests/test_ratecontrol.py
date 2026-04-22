@@ -136,12 +136,18 @@ def test_type_mismatch_errors():
         pass
 
     rc_async = RateControl(freq=1, is_coroutine=True)
-    with pytest.raises(TypeError):
-        rc_async.start_spinning(lambda: None, None)
+    try:
+        with pytest.raises(TypeError):
+            rc_async.start_spinning(lambda: None, None)
+    finally:
+        rc_async.stop_spinning()
 
     rc_sync = RateControl(freq=1, is_coroutine=False)
-    with pytest.raises(TypeError):
-        rc_sync.start_spinning(coro, None)
+    try:
+        with pytest.raises(TypeError):
+            rc_sync.start_spinning(coro, None)
+    finally:
+        rc_sync.stop_spinning()
 
 
 def test_keyboard_interrupt_handled(caplog):
@@ -393,8 +399,12 @@ def test_loop_type_error_with_coroutine():
 
     # This should raise TypeError because async_function is a coroutine
     with pytest.raises(TypeError, match=re.escape("For coroutine functions, use 'async with spin(...)' instead.")):
-        with spin(async_function, freq=100):
-            time.sleep(0.01)
+        s = spin(async_function, freq=100)
+        try:
+            with s:
+                time.sleep(0.01)
+        finally:
+            s.rc.stop_spinning()
 
 
 def test_loop_class_sync():
@@ -716,10 +726,12 @@ def test_async_with_non_coroutine():
         pass
 
     rc = RateControl(freq=100, is_coroutine=True, report=False)
-
-    # This should raise a TypeError
-    with pytest.raises(TypeError, match="Expected a coroutine function for async mode"):
-        rc.start_spinning(work, None)
+    try:
+        # This should raise a TypeError
+        with pytest.raises(TypeError, match="Expected a coroutine function for async mode"):
+            rc.start_spinning(work, None)
+    finally:
+        rc.stop_spinning()
 
 def test_sync_with_coroutine():
     """Test starting sync spinning with a coroutine function."""

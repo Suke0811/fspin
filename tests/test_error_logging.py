@@ -43,11 +43,13 @@ def test_rate_control_os_warnings():
     """Test OS-specific warnings in RateControl.__init__"""
     with patch('platform.system', return_value='Linux'):
         with pytest.warns(RuntimeWarning, match="Linux timer resolution"):
-            RateControl(freq=1000, is_coroutine=True)
+            rc = RateControl(freq=1000, is_coroutine=True)
+            rc.stop_spinning()
 
     with patch('platform.system', return_value='Darwin'):
         with pytest.warns(RuntimeWarning, match="macOS timer resolution"):
-            RateControl(freq=5000, is_coroutine=True)
+            rc = RateControl(freq=5000, is_coroutine=True)
+            rc.stop_spinning()
 
 
 @pytest.mark.asyncio
@@ -109,7 +111,15 @@ async def test_rate_control_extra_coverage():
         rc_own = RateControl(freq=10, is_coroutine=True)
         assert rc_own._own_loop is not None
         async def mock_func(): pass
-        with patch('asyncio.run_coroutine_threadsafe') as mock_run:
-            rc_own.start_spinning(mock_func, None)
-            mock_run.assert_called()
+
+        coro = mock_func()
+        # USE MagicMock instead of default Mock for start_spinning_async to avoid AsyncMock issues
+        with patch('fspin.rate_control.RateControl.start_spinning_async', MagicMock(return_value=coro)):
+            with patch('asyncio.run_coroutine_threadsafe') as mock_run:
+                rc_own.start_spinning(mock_func, None)
+                mock_run.assert_called()
+
+        # Manually close/cleanup coro to avoid warning if it wasn't awaited
+        coro.close()
+
         rc_own.stop_spinning()
