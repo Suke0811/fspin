@@ -720,6 +720,40 @@ def test_sync_with_coroutine():
     with pytest.raises(TypeError, match="Expected a regular function for sync mode"):
         rc.start_spinning(awork, None)
 
+def test_rate_control_get_report_no_start_time():
+    """Test get_report when start_time is None (line 505)"""
+    rc = RateControl(freq=10, is_coroutine=False, report=True)
+    # Ensure start_time is None (it is by default if not started)
+    # We must mock iteration_times to NOT be empty to bypass line 499
+    rc.iteration_times = [0.1]
+    rc.start_time = None
+    assert rc.get_report(output=False) == {}
+
+    # Also test line 500
+    rc.iteration_times = []
+    rc.initial_duration = None
+    assert rc.get_report(output=False) == {}
+
+
+def test_rate_control_frequency_setter_invalid():
+    """Test frequency.setter with invalid value (line 578)"""
+    rc = RateControl(freq=10, is_coroutine=False)
+    with pytest.raises(ValueError, match="Frequency must be greater than zero"):
+        rc.frequency = 0
+
+
+def test_rate_control_str_with_report():
+    """Test __str__ with reporting (lines 628-631)"""
+    rc = RateControl(freq=10, is_coroutine=False, report=True)
+    rc.iteration_times = [0.01, 0.02]
+    rc.loop_durations = [0.1, 0.1]
+    rc.deviations = [0.001, 0.001]
+    rc.start_time = 100
+    s = str(rc)
+    assert "Average Function Time" in s
+    assert "Average Loop Time" in s
+
+
 @pytest.mark.asyncio
 async def test_async_loop_with_regular_function():
     """Test async loop context manager with a regular function."""

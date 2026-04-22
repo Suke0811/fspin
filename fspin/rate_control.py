@@ -97,13 +97,22 @@ class RateControl:
                 asyncio.get_running_loop()
             except RuntimeError:
                 lp = asyncio.new_event_loop()
-                asyncio.set_event_loop(lp)
                 self._own_loop = lp
-            self._stop_event: Union[asyncio.Event, threading.Event] = asyncio.Event()
+                
+                # Start the loop in a background thread
+                def run_loop(loop):
+                    asyncio.set_event_loop(loop)
+                    loop.run_forever()
+                
+                self._loop_thread = threading.Thread(target=run_loop, args=(lp,), daemon=True)
+                self._loop_thread.start()
+                
+            self._stop_event: Union[asyncio.Event, threading.Event, None] = None
         else:
             self._stop_event = threading.Event()
         self._task: Optional[asyncio.Task] = None
         self._thread: Optional[threading.Thread] = None
+        self._loop_thread: Optional[threading.Thread] = None
 
         # Only record performance metrics if reporting is enabled.
         if self.report:
@@ -319,16 +328,16 @@ class RateControl:
         """
         condition_fn = self._prepare_condition_fn(condition_fn, is_async=True)
 
+        if self._stop_event is None:
+            self._stop_event = asyncio.Event()
+        
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
         first_iteration = True
         try:
-            # We know it's asyncio.Event because is_async=True
             stop_event = self._stop_event
-            # In some cases _stop_event might be initialized before we know if it's async or sync 
-            # but RateControl init handles it.
             
-            while not (stop_event.is_set() if isinstance(stop_event, threading.Event) else stop_event.is_set()) and await condition_fn(): # type: ignore
+            while not stop_event.is_set() and await condition_fn():
                 iteration_start = time.perf_counter()
                 try:
                     await func(*args, **kwargs)
@@ -462,7 +471,17 @@ class RateControl:
         if self.is_coroutine:
             if not asyncio.iscoroutinefunction(func):
                 raise TypeError("Expected a coroutine function for async mode.")
-            return asyncio.run_coroutine_threadsafe(self.start_spinning_async(func, condition_fn, *args, **kwargs), asyncio.get_event_loop()) if self._own_loop else asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs)) # type: ignore
+            
+            if self._own_loop:
+                # Schedule on the background loop
+                self._task = asyncio.run_coroutine_threadsafe(
+                    self.start_spinning_async(func, condition_fn, *args, **kwargs), 
+                    self._own_loop
+                ) # type: ignore
+                return self._task
+            else:
+                # Current loop
+                return self.start_spinning_async(func, condition_fn, *args, **kwargs) # type: ignore
         else:
             if asyncio.iscoroutinefunction(func):
                 raise TypeError("Expected a regular function for sync mode.")
@@ -472,19 +491,26 @@ class RateControl:
         """
         Signals the spinning loop to stop.
         """
-        self._stop_event.set()
+        if self._stop_event is not None:
+            self._stop_event.set()
+        
         if self.is_coroutine:
             if self._task:
-                self._task.cancel()
+                if hasattr(self._task, 'cancel'):
+                    self._task.cancel()
         else:
             if self._thread:
                 # Avoid deadlock if stop_spinning is called from within the worker thread
                 current = threading.current_thread()
                 if self._thread.is_alive() and current is not self._thread:
                     self._thread.join()
+        
         if self._own_loop is not None:
-            self._own_loop.close()
+            self._own_loop.call_soon_threadsafe(self._own_loop.stop)
+            if self._loop_thread and self._loop_thread.is_alive():
+                self._loop_thread.join(timeout=1.0)
             self._own_loop = None
+            self._loop_thread = None
 
     def get_report(self, output: bool = True) -> Dict[str, Any]:
         """
@@ -539,7 +565,7 @@ class RateControl:
         Returns:
             bool: True if the loop is running, False otherwise.
         """
-        return not self._stop_event.is_set()
+        return self._stop_event is not None and not self._stop_event.is_set()
 
     @property
     def elapsed_time(self) -> float:
