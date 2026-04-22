@@ -3,7 +3,7 @@ import sys
 
 try:
     from importlib import resources
-except ImportError:
+except ImportError: # pragma: no cover
     # Fallback for Python < 3.7
     import importlib_resources as resources
 
@@ -30,5 +30,5 @@ def main():
             print("fspin Cheatsheet not found.")
             print("Please check the online documentation at https://github.com/Suke0811/fspin")
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     main()

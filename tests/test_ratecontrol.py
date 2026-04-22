@@ -9,8 +9,7 @@ import re
 
 from fspin.reporting import ReportLogger
 from fspin.rate_control import RateControl
-from fspin.decorators import spin
-from fspin.loop_context import loop
+from fspin.unified import spin
 
 def test_create_histogram():
     logger = ReportLogger(enabled=True)
@@ -253,7 +252,7 @@ def test_loop_context_manager_basic_counts():
         calls.append(time.perf_counter())
 
     # Run at 100 Hz in a background thread for ~50 ms ⇒ ~5 calls
-    with loop(work, freq=100, report=True, thread=True) as lp:
+    with spin(work, freq=100, report=True, thread=True) as lp:
         time.sleep(0.05)
 
     # After exit, the loop has been stopped by __exit__
@@ -270,7 +269,7 @@ def test_loop_context_manager_with_args_kwargs():
         calls.append((x, y))
 
     # Supply both positional and keyword args to your work()
-    with loop(work, freq=1000, report=False, thread=True, x=7, y=8) as lp:
+    with spin(work, freq=1000, report=False, thread=True, x=7, y=8) as lp:
         time.sleep(0.005)
 
     # All calls should see the same arguments
@@ -394,7 +393,7 @@ def test_loop_type_error_with_coroutine():
 
     # This should raise TypeError because async_function is a coroutine
     with pytest.raises(TypeError, match=re.escape("For coroutine functions, use 'async with spin(...)' instead.")):
-        with loop(async_function, freq=100):
+        with spin(async_function, freq=100):
             time.sleep(0.01)
 
 
@@ -405,7 +404,7 @@ def test_loop_class_sync():
         calls.append(time.perf_counter())
 
     # Test the loop class with a synchronous function
-    with loop(work, freq=100, report=True) as lp:
+    with spin(work, freq=100, report=True) as lp:
         time.sleep(0.05)  # Let it run for a short time
 
     assert len(calls) > 0, "No iterations were recorded"
@@ -421,7 +420,7 @@ async def test_loop_class_async():
         await asyncio.sleep(0)
 
     # Test the loop class with an asynchronous function
-    async with loop(awork, freq=100, report=True) as lp:
+    async with spin(awork, freq=100, report=True) as lp:
         await asyncio.sleep(0.05)  # Let it run for a short time
 
     assert len(calls) > 0, "No iterations were recorded"
@@ -438,7 +437,7 @@ async def test_loop_class_async_fire_and_forget():
 
     # Test the loop class with an asynchronous function in fire-and-forget mode
     start_time = time.perf_counter()
-    async with loop(awork, freq=100, report=True) as lp:
+    async with spin(awork, freq=100, report=True) as lp:
         # This should return immediately without waiting for the task to complete
         elapsed = time.perf_counter() - start_time
         assert elapsed < 0.05, "Context manager did not return immediately"
@@ -492,8 +491,7 @@ from statistics import mean, stdev
 
 from fspin.reporting import ReportLogger
 from fspin.rate_control import RateControl
-from fspin.decorators import spin
-from fspin.loop_context import loop
+from fspin.unified import spin
 
 # Test for uncovered code in decorators.py
 def test_sync_decorator_with_thread():
@@ -523,7 +521,7 @@ def test_loop_context_with_exception():
         calls.append(1)
 
     try:
-        with loop(work, freq=100, report=True) as lp:
+        with spin(work, freq=100, report=True) as lp:
             time.sleep(0.01)
             raise ValueError("Test exception")
     except ValueError:
@@ -762,5 +760,5 @@ async def test_async_loop_with_regular_function():
 
     # This should raise a TypeError
     with pytest.raises(TypeError, match="For regular functions, use 'with spin(...)"):
-        async with loop(work, freq=100) as _:
+        async with spin(work, freq=100) as _:
             await asyncio.sleep(0.01)

@@ -16,10 +16,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Set FORCE_JAVASCRIPT_ACTIONS_TO_NODE24
+        run: echo "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true" >> $GITHUB_ENV
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov pytest-asyncio
+          pip install pytest pytest-cov pytest-asyncio pytest-timeout
           pip install -e .
       - name: Run tests
         run: |
