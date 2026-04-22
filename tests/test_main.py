@@ -1,7 +1,4 @@
-import os
-import sys
 import pytest
-import asyncio
 from unittest.mock import patch, mock_open
 from fspin.__main__ import main as cli_main
 from fspin.unified import UnifiedSpin

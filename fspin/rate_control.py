@@ -92,6 +92,10 @@ class RateControl:
                     category=RuntimeWarning,
                 )
 
+        self._task: Optional[asyncio.Task] = None
+        self._thread: Optional[threading.Thread] = None
+        self._loop_thread: Optional[threading.Thread] = None
+
         if is_coroutine:
             try:
                 asyncio.get_running_loop()
@@ -110,9 +114,6 @@ class RateControl:
             self._stop_event: Union[asyncio.Event, threading.Event, None] = None
         else:
             self._stop_event = threading.Event()
-        self._task: Optional[asyncio.Task] = None
-        self._thread: Optional[threading.Thread] = None
-        self._loop_thread: Optional[threading.Thread] = None
 
         # Only record performance metrics if reporting is enabled.
         if self.report:
@@ -444,9 +445,9 @@ class RateControl:
         if wait:
             try:
                 await task
-            except asyncio.CancelledError:
-                # Task was cancelled, which is expected when condition is met
-                pass
+            finally:
+                # Ensure the spinning is stopped if we were waiting for it
+                self.stop_spinning()
 
         return self if wait else task
 
@@ -474,6 +475,8 @@ class RateControl:
             
             if self._own_loop:
                 # Schedule on the background loop
+                # run_coroutine_threadsafe returns a concurrent.futures.Future
+                # We store it in self._task even though it's not an asyncio.Task
                 self._task = asyncio.run_coroutine_threadsafe(
                     self.start_spinning_async(func, condition_fn, *args, **kwargs), 
                     self._own_loop
@@ -506,9 +509,21 @@ class RateControl:
                     self._thread.join()
         
         if self._own_loop is not None:
-            self._own_loop.call_soon_threadsafe(self._own_loop.stop)
-            if self._loop_thread and self._loop_thread.is_alive():
-                self._loop_thread.join(timeout=1.0)
+            loop = self._own_loop
+            loop_thread = self._loop_thread
+            
+            # Stop the loop
+            loop.call_soon_threadsafe(loop.stop)
+            
+            # Join the thread if we're not in it
+            current = threading.current_thread()
+            if loop_thread and loop_thread.is_alive() and current is not loop_thread:
+                loop_thread.join(timeout=1.0)
+            
+            # Close the loop
+            if not loop.is_running() and not loop.is_closed():
+                loop.close()
+            
             self._own_loop = None
             self._loop_thread = None
 

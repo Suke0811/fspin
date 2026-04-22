@@ -552,7 +552,9 @@ def test_report_logger_with_disabled_output():
 
 # Test for uncovered code in rate_control.py
 def test_rate_control_with_own_loop():
-    """Test RateControl creating its own event loop."""
+    """Test RateControl creating its own event loop and ensure no leaks."""
+    import threading
+    
     # Save the current event loop
     try:
         old_loop = asyncio.get_event_loop()
@@ -564,14 +566,26 @@ def test_rate_control_with_own_loop():
     if old_loop and not old_loop.is_closed():
         old_loop.close()
 
+    initial_threads = threading.active_count()
+    
     # Create RateControl with is_coroutine=True, which should create its own loop
     rc = RateControl(freq=100, is_coroutine=True)
 
     # Verify the loop was created
     assert rc._own_loop is not None, "RateControl should create its own event loop"
-
+    assert rc._loop_thread is not None, "RateControl should have a loop thread"
+    assert rc._loop_thread.is_alive(), "Loop thread should be running"
+    
     # Clean up
     rc.stop_spinning()
+
+    assert rc._own_loop is None, "Loop reference should be cleared"
+    assert rc._loop_thread is None, "Loop thread reference should be cleared"
+    
+    # Check that the thread actually finished
+    # We might need a small sleep or a more robust check if active_count is noisy
+    # but since we joined in stop_spinning, it should be gone.
+    assert threading.active_count() <= initial_threads, "Thread leaked"
 
     # Restore the event loop if needed
     if old_loop and not old_loop.is_closed():
@@ -750,6 +764,33 @@ def test_rate_control_str_with_report():
     s = str(rc)
     assert "Average Function Time" in s
     assert "Average Loop Time" in s
+
+
+@pytest.mark.asyncio
+async def test_start_spinning_async_wrapper_cancellation_stops_spinning():
+    """Verify that cancelling start_spinning_async_wrapper(wait=True) calls stop_spinning."""
+    rc = RateControl(freq=100, is_coroutine=True)
+    
+    async def slow_work():
+        while True:
+            await asyncio.sleep(0.01)
+            
+    # start_spinning_async_wrapper with wait=True
+    task = asyncio.create_task(rc.start_spinning_async_wrapper(slow_work, wait=True))
+    
+    # Let it run for a bit
+    await asyncio.sleep(0.05)
+    assert rc.is_running()
+    
+    # Cancel the wrapper task
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+        
+    # Check if spinning was stopped via the finally block
+    assert not rc.is_running(), "Spinning should be stopped after wrapper cancellation"
 
 
 @pytest.mark.asyncio
