@@ -35,7 +35,7 @@ def run_sync_examples():
         time.sleep(1)
     # Report is generated automatically when report=True
 
-    # Manually terminating the spinning. report info accessible from sp instance.
+    # Manually terminating the spinning. report info accessible from sp instance if report=True.
     print("\nManually stopping the spin:")
     with spin(heartbeat, freq=50, report=True) as sp:
         # Let it run for 1 s, then stop spinning manually
@@ -44,8 +44,9 @@ def run_sync_examples():
         print("Manually stopped after 1 s")
 
     # Once out of the with-block, sp is still available:
-    print(f"Total iterations recorded: {len(sp.iteration_times)}")
-    print("Deviations (s):", sp.deviations)
+    if sp.report:
+        print(f"Total iterations recorded: {len(sp.iteration_times)}")
+        print("Deviations (s):", sp.deviations)
     # sp.get_report()
 
 # ===== Asynchronous Examples =====
