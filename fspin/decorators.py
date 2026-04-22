@@ -1,8 +1,9 @@
 import asyncio
 from functools import wraps
+from typing import Callable, Any, Union, Optional
 from .rate_control import RateControl
 
-def spin(freq, condition_fn=None, report=False, thread=False, wait=False):
+def spin(freq: float, condition_fn: Optional[Callable] = None, report: bool = False, thread: bool = False, wait: bool = False) -> Callable:
     """
     Decorator to run the decorated function at a specified frequency (Hz).
 
@@ -41,11 +42,11 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=False):
         ... async def background_task():
         ...     print("Running in the background")
     """
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         is_coroutine = asyncio.iscoroutinefunction(func)
         if is_coroutine:
             @wraps(func)
-            async def async_wrapper(*args, **kwargs):
+            async def async_wrapper(*args: Any, **kwargs: Any) -> RateControl:
                 rc = RateControl(freq, is_coroutine=True, report=report, thread=thread)
                 task = await rc.start_spinning_async(func, condition_fn, *args, **kwargs)
 
@@ -63,10 +64,10 @@ def spin(freq, condition_fn=None, report=False, thread=False, wait=False):
             return async_wrapper
         else:
             @wraps(func)
-            def sync_wrapper(*args, **kwargs):
+            def sync_wrapper(*args: Any, **kwargs: Any) -> RateControl:
                 rc = RateControl(freq, is_coroutine=False, report=report, thread=thread)
                 # Forward wait for sync threaded mode; if wait=True it will join before returning
-                rc.start_spinning(func, condition_fn, *args, wait=wait, **kwargs)
+                rc.start_spinning(func, condition_fn, *args, wait=wait, **kwargs) # type: ignore
                 # If we waited (thread join or blocking mode), ensure stopped; otherwise leave running
                 if wait or not thread:
                     rc.stop_spinning()

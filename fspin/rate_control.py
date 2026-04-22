@@ -1,3 +1,4 @@
+from typing import List, Optional, Callable, Any, Union, Dict
 import time
 import warnings
 import threading
@@ -45,7 +46,7 @@ class RateControl:
         elapsed_time (float): Time elapsed since start in seconds.
         exception_count (int): Number of exceptions raised during execution.
     """
-    def __init__(self, freq, is_coroutine, report=False, thread=True):
+    def __init__(self, freq: float, is_coroutine: bool, report: bool = False, thread: bool = True):
         """
         Initialize RateControl.
 
@@ -66,8 +67,8 @@ class RateControl:
         self.is_coroutine = is_coroutine
         self.report = report
         self.thread = thread
-        self.exceptions = []
-        self._own_loop = None
+        self.exceptions: List[Exception] = []
+        self._own_loop: Optional[asyncio.AbstractEventLoop] = None
 
         # Check if running async with high frequency based on OS
         system = platform.system()
@@ -98,20 +99,20 @@ class RateControl:
                 lp = asyncio.new_event_loop()
                 asyncio.set_event_loop(lp)
                 self._own_loop = lp
-            self._stop_event = asyncio.Event()
+            self._stop_event: Union[asyncio.Event, threading.Event] = asyncio.Event()
         else:
             self._stop_event = threading.Event()
-        self._task = None
-        self._thread = None
+        self._task: Optional[asyncio.Task] = None
+        self._thread: Optional[threading.Thread] = None
 
         # Only record performance metrics if reporting is enabled.
         if self.report:
-            self.iteration_times = []
-            self.loop_durations = []
-            self.deviations = []
-            self.initial_duration = None
-            self.start_time = None
-            self.end_time = None
+            self.iteration_times: Optional[List[float]] = []
+            self.loop_durations: Optional[List[float]] = []
+            self.deviations: Optional[List[float]] = []
+            self.initial_duration: Optional[float] = None
+            self.start_time: Optional[float] = None
+            self.end_time: Optional[float] = None
         else:
             self.iteration_times = None
             self.loop_durations = None
@@ -125,7 +126,7 @@ class RateControl:
         # Always maintain deviation accumulator for loop compensation.
         self.deviation_accumulator = 0.0
 
-    def _prepare_condition_fn(self, condition_fn, *, is_async):
+    def _prepare_condition_fn(self, condition_fn: Optional[Callable], *, is_async: bool) -> Callable:
         """
         Prepare the condition function, using a default if None is provided.
 
@@ -138,32 +139,32 @@ class RateControl:
             callable: A function that returns True to continue spinning.
         """
         if getattr(condition_fn, "_fspin_prepared_condition", False):
-            return condition_fn
+            return condition_fn # type: ignore
 
-        def _mark_prepared(fn):
+        def _mark_prepared(fn: Callable) -> Callable:
             setattr(fn, "_fspin_prepared_condition", True)
             return fn
 
         if condition_fn is None:
             if is_async:
-                async def default_condition():
+                async def default_condition() -> bool:
                     return True
 
                 return _mark_prepared(default_condition)
 
-            def default_condition():
+            def default_condition() -> bool:
                 return True
 
             return _mark_prepared(default_condition)
 
         if is_async:
             if inspect.iscoroutinefunction(condition_fn):
-                async def async_condition():
-                    return bool(await condition_fn())
+                async def async_condition() -> bool:
+                    return bool(await condition_fn()) # type: ignore
 
                 return _mark_prepared(async_condition)
 
-            async def async_condition():
+            async def async_condition() -> bool:
                 result = condition_fn()
                 if inspect.isawaitable(result):
                     result = await result
@@ -174,7 +175,7 @@ class RateControl:
         if inspect.iscoroutinefunction(condition_fn):
             raise TypeError("Synchronous spinning does not support coroutine condition functions.")
 
-        def sync_condition():
+        def sync_condition() -> bool:
             result = condition_fn()
             if inspect.isawaitable(result):
                 raise TypeError("Synchronous spinning does not support awaitable condition functions.")
@@ -182,7 +183,7 @@ class RateControl:
 
         return _mark_prepared(sync_condition)
 
-    def _handle_exception(self, e, func, is_coroutine=False):
+    def _handle_exception(self, e: Exception, func: Callable, is_coroutine: bool = False) -> None:
         """
         Handle an exception raised during function execution.
 
@@ -201,7 +202,7 @@ class RateControl:
             category=RuntimeWarning,
         )
 
-    def _record_function_duration(self, function_duration, first_iteration):
+    def _record_function_duration(self, function_duration: float, first_iteration: bool) -> bool:
         """
         Record the function duration for reporting.
 
@@ -216,11 +217,11 @@ class RateControl:
             if first_iteration:
                 self.initial_duration = function_duration
                 return False
-            else:
+            elif self.iteration_times is not None:
                 self.iteration_times.append(function_duration)
         return first_iteration
 
-    def _calculate_sleep_duration(self, elapsed):
+    def _calculate_sleep_duration(self, elapsed: float) -> float:
         """
         Calculate the sleep duration to maintain the desired frequency.
 
@@ -233,7 +234,7 @@ class RateControl:
         return max(min(self.loop_duration - elapsed - self.deviation_accumulator,
                        self.loop_duration), 0)
 
-    def _update_metrics(self, total_loop_duration):
+    def _update_metrics(self, total_loop_duration: float) -> None:
         """
         Update metrics after a loop iteration.
 
@@ -244,10 +245,12 @@ class RateControl:
         self.deviation_accumulator += deviation
 
         if self.report:
-            self.deviations.append(deviation)
-            self.loop_durations.append(total_loop_duration)
+            if self.deviations is not None:
+                self.deviations.append(deviation)
+            if self.loop_durations is not None:
+                self.loop_durations.append(total_loop_duration)
 
-    def _finalize_spin(self):
+    def _finalize_spin(self) -> None:
         """
         Finalize the spinning process.
         """
@@ -255,7 +258,7 @@ class RateControl:
         if self.report:
             self.get_report()
 
-    def spin_sync(self, func, condition_fn, *args, **kwargs):
+    def spin_sync(self, func: Callable, condition_fn: Optional[Callable], *args: Any, **kwargs: Any) -> None:
         """
         Synchronous spinning using threading with deviation compensation.
 
@@ -272,7 +275,11 @@ class RateControl:
         loop_start_time = self.start_time
         first_iteration = True
         try:
-            while not self._stop_event.is_set() and condition_fn():
+            # We know it's threading.Event because is_async=False
+            stop_event = self._stop_event
+            assert isinstance(stop_event, threading.Event)
+
+            while not stop_event.is_set() and condition_fn():
                 iteration_start = time.perf_counter()
                 try:
                     func(*args, **kwargs)
@@ -299,7 +306,7 @@ class RateControl:
         finally:
             self._finalize_spin()
 
-    async def spin_async(self, func, condition_fn, *args, **kwargs):
+    async def spin_async(self, func: Callable, condition_fn: Optional[Callable], *args: Any, **kwargs: Any) -> None:
         """
         Asynchronous spinning using asyncio with deviation compensation.
 
@@ -316,7 +323,12 @@ class RateControl:
         loop_start_time = self.start_time
         first_iteration = True
         try:
-            while not self._stop_event.is_set() and await condition_fn():
+            # We know it's asyncio.Event because is_async=True
+            stop_event = self._stop_event
+            # In some cases _stop_event might be initialized before we know if it's async or sync 
+            # but RateControl init handles it.
+            
+            while not (stop_event.is_set() if isinstance(stop_event, threading.Event) else stop_event.is_set()) and await condition_fn(): # type: ignore
                 iteration_start = time.perf_counter()
                 try:
                     await func(*args, **kwargs)
@@ -348,7 +360,7 @@ class RateControl:
         finally:
             self._finalize_spin()
 
-    def start_spinning_sync(self, func, condition_fn, *args, **kwargs):
+    def start_spinning_sync(self, func: Callable, condition_fn: Optional[Callable], *args: Any, **kwargs: Any) -> Optional[threading.Thread]:
         """
         Starts spinning synchronously, either blocking or in a separate thread.
 
@@ -384,7 +396,7 @@ class RateControl:
             self.spin_sync(func, condition_fn, *args, **kwargs)
             return None
 
-    async def start_spinning_async(self, func, condition_fn, *args, **kwargs):
+    async def start_spinning_async(self, func: Callable, condition_fn: Optional[Callable], *args: Any, **kwargs: Any) -> asyncio.Task:
         """
         Starts spinning asynchronously as an asyncio Task.
 
@@ -403,7 +415,7 @@ class RateControl:
         self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
         return self._task
 
-    async def start_spinning_async_wrapper(self, func, condition_fn=None, *, wait=False, **kwargs):
+    async def start_spinning_async_wrapper(self, func: Callable, condition_fn: Optional[Callable] = None, *, wait: bool = False, **kwargs: Any) -> Union['RateControl', asyncio.Task]:
         """
         Wrapper for start_spinning_async to be used with await.
 
@@ -429,7 +441,7 @@ class RateControl:
 
         return self if wait else task
 
-    def start_spinning(self, func, condition_fn, *args, **kwargs):
+    def start_spinning(self, func: Callable, condition_fn: Optional[Callable], *args: Any, **kwargs: Any) -> Optional[Union[threading.Thread, asyncio.Task]]:
         """
         Starts the spinning process based on the mode.
 
@@ -450,13 +462,13 @@ class RateControl:
         if self.is_coroutine:
             if not asyncio.iscoroutinefunction(func):
                 raise TypeError("Expected a coroutine function for async mode.")
-            return self.start_spinning_async(func, condition_fn, *args, **kwargs)
+            return asyncio.run_coroutine_threadsafe(self.start_spinning_async(func, condition_fn, *args, **kwargs), asyncio.get_event_loop()) if self._own_loop else asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs)) # type: ignore
         else:
             if asyncio.iscoroutinefunction(func):
                 raise TypeError("Expected a regular function for sync mode.")
             return self.start_spinning_sync(func, condition_fn, *args, **kwargs)
 
-    def stop_spinning(self):
+    def stop_spinning(self) -> None:
         """
         Signals the spinning loop to stop.
         """
@@ -474,7 +486,7 @@ class RateControl:
             self._own_loop.close()
             self._own_loop = None
 
-    def get_report(self, output=True):
+    def get_report(self, output: bool = True) -> Dict[str, Any]:
         """
         Aggregates performance data and delegates report generation to the logger.
 
@@ -489,14 +501,20 @@ class RateControl:
             return {}
 
         end_time = self.end_time or time.perf_counter()
+        if self.start_time is None:
+            return {}
+            
         total_duration = end_time - self.start_time
-        total_iterations = len(self.iteration_times)
+        total_iterations = 0
+        if self.iteration_times is not None:
+            total_iterations = len(self.iteration_times)
         if self.initial_duration is not None:
             total_iterations += 1
+            
         avg_function_duration = mean(self.iteration_times) if self.iteration_times else 0
         avg_deviation = mean(self.deviations) if self.deviations else 0
         max_deviation = max(self.deviations) if self.deviations else 0
-        std_dev_deviation = stdev(self.deviations) if len(self.deviations) > 1 else 0.0
+        std_dev_deviation = stdev(self.deviations) if self.deviations and len(self.deviations) > 1 else 0.0
         avg_loop_duration = mean(self.loop_durations) if self.loop_durations else 0
         avg_frequency = 1 / avg_loop_duration if avg_loop_duration > 0 else 0
 
@@ -506,7 +524,7 @@ class RateControl:
                 total_duration=total_duration, total_iterations=total_iterations, avg_frequency=avg_frequency,
                 avg_function_duration=avg_function_duration, avg_loop_duration=avg_loop_duration,
                 avg_deviation=avg_deviation, max_deviation=max_deviation, std_dev_deviation=std_dev_deviation,
-                deviations=self.deviations, exceptions=self.exceptions, mode=self.mode)
+                deviations=self.deviations or [], exceptions=self.exceptions, mode=self.mode)
 
         return {"frequency": self._freq, "loop_duration": self.loop_duration, "initial_duration": self.initial_duration,
                 "total_duration": total_duration, "total_iterations": total_iterations, "avg_frequency": avg_frequency,
@@ -514,7 +532,7 @@ class RateControl:
                 "avg_deviation": avg_deviation, "max_deviation": max_deviation, "std_dev_deviation": std_dev_deviation,
                 "deviations": self.deviations, "exceptions": self.exceptions, "exception_count": self.exception_count}
 
-    def is_running(self):
+    def is_running(self) -> bool:
         """
         Check if the spinning loop is running.
 
@@ -524,7 +542,7 @@ class RateControl:
         return not self._stop_event.is_set()
 
     @property
-    def elapsed_time(self):
+    def elapsed_time(self) -> float:
         """
         Get the elapsed time since the start of spinning.
 
@@ -536,7 +554,7 @@ class RateControl:
         return time.perf_counter() - self.start_time
 
     @property
-    def frequency(self):
+    def frequency(self) -> float:
         """
         Get the current loop frequency in Hz.
 
@@ -546,7 +564,7 @@ class RateControl:
         return self._freq
 
     @frequency.setter
-    def frequency(self, value):
+    def frequency(self, value: float) -> None:
         """
         Set the loop frequency and update loop duration accordingly.
 
@@ -562,7 +580,7 @@ class RateControl:
         self.loop_duration = 1.0 / value
 
     @property
-    def status(self):
+    def status(self) -> str:
         """
         Get the current status of the spinning loop.
 
@@ -572,7 +590,7 @@ class RateControl:
         return "running" if self.is_running() else "stopped"
 
     @property
-    def mode(self):
+    def mode(self) -> str:
         """
         Get the current execution mode.
 
@@ -582,7 +600,7 @@ class RateControl:
         return "async" if self.is_coroutine else "sync-threaded" if self.thread else "sync-blocking"
 
     @property
-    def exception_count(self):
+    def exception_count(self) -> int:
         """
         Get the number of exceptions raised during execution.
 
@@ -591,7 +609,7 @@ class RateControl:
         """
         return len(self.exceptions)
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Get a string representation of the RateControl object.
 
@@ -606,7 +624,7 @@ class RateControl:
             f"Elapsed Time         : {self.elapsed_time:.3f} s",
             f"Running              : {self.status}",
         ]
-        if self.report and self.iteration_times:
+        if self.report and self.iteration_times and self.loop_durations and self.deviations:
             avg_func = mean(self.iteration_times)
             avg_loop = mean(self.loop_durations)
             avg_dev = mean(self.deviations)
@@ -618,7 +636,7 @@ class RateControl:
             ]
         return "\n".join(lines)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Get a developer-friendly representation of the RateControl object.
 

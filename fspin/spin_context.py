@@ -1,4 +1,5 @@
 import asyncio
+from typing import Callable, Any, Optional
 from .rate_control import RateControl
 
 class spin:
@@ -68,7 +69,7 @@ class spin:
         >>> with spin(with_arguments, 10, "value", kw=123):
         ...     time.sleep(0.1)
     """
-    def __init__(self, func, freq, *func_args, condition_fn=None, report=False, thread=True, wait=False, **func_kwargs):
+    def __init__(self, func: Callable, freq: float, *func_args: Any, condition_fn: Optional[Callable] = None, report: bool = False, thread: bool = True, wait: bool = False, **func_kwargs: Any):
         # Automatically detect if the function is a coroutine
         is_coroutine = asyncio.iscoroutinefunction(func)
 
@@ -80,17 +81,17 @@ class spin:
         self.is_coroutine = is_coroutine
         self.wait = wait
 
-    def __enter__(self):
+    def __enter__(self) -> RateControl:
         if self.is_coroutine:
             raise TypeError("For coroutine functions, use 'async with spin(...)' instead.")
 
-        self.rc.start_spinning(self.func, self.condition_fn, *self.args, wait=self.wait, **self.kwargs)
+        self.rc.start_spinning(self.func, self.condition_fn, *self.args, wait=self.wait, **self.kwargs) # type: ignore
         return self.rc
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.rc.stop_spinning()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> RateControl:
         if not self.is_coroutine:
             raise TypeError("For regular functions, use 'with spin(...)' instead.")
 
@@ -98,5 +99,5 @@ class spin:
         self._task = await self.rc.start_spinning_async(self.func, self.condition_fn, *self.args, **self.kwargs)
         return self.rc
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.rc.stop_spinning()
