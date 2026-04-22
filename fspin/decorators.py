@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from functools import wraps
 from typing import Callable, Any, Union, Optional
 from .rate_control import RateControl
@@ -43,7 +44,7 @@ def spin(freq: float, condition_fn: Optional[Callable] = None, report: bool = Fa
         ...     print("Running in the background")
     """
     def decorator(func: Callable) -> Callable:
-        is_coroutine = asyncio.iscoroutinefunction(func)
+        is_coroutine = inspect.iscoroutinefunction(func)
         if is_coroutine:
             @wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> RateControl:

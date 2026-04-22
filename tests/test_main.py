@@ -13,7 +13,7 @@ def test_cli_main(capsys):
         # Mock modern importlib.resources
         mock_resources.files.return_value.joinpath.return_value.read_text.return_value = "Mocked Cheatsheet"
         # We need to mock start_spinning_async to avoid "never awaited" warning because of UnifiedSpin import
-        with patch('fspin.rate_control.RateControl.start_spinning_async', return_value=asyncio.Future()):
+        with patch('fspin.rate_control.RateControl.start_spinning_async', side_effect=lambda *args, **kwargs: None):
             cli_main()
         captured = capsys.readouterr()
         assert "Mocked Cheatsheet" in captured.out
@@ -22,7 +22,7 @@ def test_cli_main(capsys):
         # Mock older importlib.resources
         del mock_resources.files
         mock_resources.open_text.return_value.__enter__.return_value.read.return_value = "Old Mocked Cheatsheet"
-        with patch('fspin.rate_control.RateControl.start_spinning_async', return_value=asyncio.Future()):
+        with patch('fspin.rate_control.RateControl.start_spinning_async', side_effect=lambda *args, **kwargs: None):
             cli_main()
         captured = capsys.readouterr()
         assert "Old Mocked Cheatsheet" in captured.out
@@ -31,7 +31,7 @@ def test_cli_main(capsys):
         mock_resources.files.side_effect = Exception("Failed")
         with patch('os.path.exists', return_value=True):
             with patch('builtins.open', mock_open(read_data="Local Cheatsheet")):
-                with patch('fspin.rate_control.RateControl.start_spinning_async', return_value=asyncio.Future()):
+                with patch('fspin.rate_control.RateControl.start_spinning_async', side_effect=lambda *args, **kwargs: None):
                     cli_main()
                 captured = capsys.readouterr()
                 assert "Local Cheatsheet" in captured.out
@@ -39,7 +39,7 @@ def test_cli_main(capsys):
     with patch('fspin.__main__.resources') as mock_resources:
         mock_resources.files.side_effect = Exception("Failed")
         with patch('os.path.exists', return_value=False):
-            with patch('fspin.rate_control.RateControl.start_spinning_async', return_value=asyncio.Future()):
+            with patch('fspin.rate_control.RateControl.start_spinning_async', side_effect=lambda *args, **kwargs: None):
                 cli_main()
             captured = capsys.readouterr()
             assert "fspin Cheatsheet not found." in captured.out

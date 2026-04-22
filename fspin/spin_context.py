@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Callable, Any, Optional
 from .rate_control import RateControl
 
@@ -71,7 +72,7 @@ class spin:
     """
     def __init__(self, func: Callable, freq: float, *func_args: Any, condition_fn: Optional[Callable] = None, report: bool = False, thread: bool = True, wait: bool = False, **func_kwargs: Any):
         # Automatically detect if the function is a coroutine
-        is_coroutine = asyncio.iscoroutinefunction(func)
+        is_coroutine = inspect.iscoroutinefunction(func)
 
         self.rc = RateControl(freq, is_coroutine=is_coroutine, report=report, thread=thread)
         self.func = func

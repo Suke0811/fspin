@@ -469,7 +469,7 @@ class RateControl:
             TypeError: If the function type does not match the mode.
         """
         if self.is_coroutine:
-            if not asyncio.iscoroutinefunction(func):
+            if not inspect.iscoroutinefunction(func):
                 raise TypeError("Expected a coroutine function for async mode.")
             
             if self._own_loop:
@@ -483,7 +483,7 @@ class RateControl:
                 # Current loop
                 return self.start_spinning_async(func, condition_fn, *args, **kwargs) # type: ignore
         else:
-            if asyncio.iscoroutinefunction(func):
+            if inspect.iscoroutinefunction(func):
                 raise TypeError("Expected a regular function for sync mode.")
             return self.start_spinning_sync(func, condition_fn, *args, **kwargs)
 
