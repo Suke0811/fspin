@@ -23,14 +23,16 @@ def test_cli_main(capsys):
         captured = capsys.readouterr()
         assert "Old Mocked Cheatsheet" in captured.out
 
-    with patch('fspin.__main__.resources.files', side_effect=Exception("Failed")):
+    with patch('fspin.__main__.resources') as mock_resources:
+        mock_resources.files.side_effect = Exception("Failed")
         with patch('os.path.exists', return_value=True):
             with patch('builtins.open', mock_open(read_data="Local Cheatsheet")):
                 cli_main()
                 captured = capsys.readouterr()
                 assert "Local Cheatsheet" in captured.out
 
-    with patch('fspin.__main__.resources.files', side_effect=Exception("Failed")):
+    with patch('fspin.__main__.resources') as mock_resources:
+        mock_resources.files.side_effect = Exception("Failed")
         with patch('os.path.exists', return_value=False):
             cli_main()
             captured = capsys.readouterr()
