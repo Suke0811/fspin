@@ -54,9 +54,16 @@ async def my_async_function_non_blocking():
 The context manager provides a way to run a function at a specified frequency within a specific scope. Using lambdas for the condition function is preferred for simple logic.
 
 ```python
+from fspin import spin
+import time
+import asyncio
+
 # For synchronous functions (threaded, fire-and-forget)
 # Preferred usage with lambda condition
 count = 0
+def my_function():
+    print("Sync work")
+
 with spin(my_function, freq=10, condition_fn=lambda: count < 5) as rc:
     while rc.is_running():
         count += 1
@@ -69,6 +76,11 @@ with spin(my_function, freq=10, thread=True, wait=True, condition_fn=lambda: cou
     pass
 
 # For asynchronous functions (always runs in background while inside the context)
+async def my_async_function():
+    print("Async work")
+    await asyncio.sleep(0.01)
+
+count = 0
 async with spin(my_async_function, freq=5, condition_fn=lambda: count < 15) as rc:
     # Function runs in the background at 5Hz
     await asyncio.sleep(1)  # Let it run for 1 second
@@ -81,6 +93,15 @@ For more manual control, you can use the `RateControl` class directly (or its al
 
 ```python
 from fspin import rate
+import time
+import asyncio
+
+def my_function():
+    print("Sync work")
+
+async def my_async_function():
+    print("Async work")
+    await asyncio.sleep(0.01)
 
 # For synchronous functions
 rc = rate(freq=10, is_coroutine=False, report=True, thread=True)
@@ -282,10 +303,13 @@ rc2 = sync_blocking()   # blocks until 5 iterations complete
 ### 3c. Async manual: explicit blocking with wrapper
 
 ```python
+from fspin import rate
+import asyncio
+
 rc = rate(freq=5, is_coroutine=True)
 
 async def work():
-    ...
+    pass
 
 # Block until loop finishes
 await rc.start_spinning_async_wrapper(work, wait=True)
@@ -299,6 +323,12 @@ task = await rc.start_spinning_async_wrapper(work, wait=False)
 ### 4. Change frequency at runtime
 
 ```python
+from fspin import rate
+import time
+
+def my_function():
+    print("Sync work")
+
 rc = rate(freq=2, is_coroutine=False, report=True, thread=True)
 rc.start_spinning(my_function)
 time.sleep(2)

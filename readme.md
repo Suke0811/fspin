@@ -24,8 +24,9 @@ pip install -r requirements-dev.txt
 ```
 
 ## Features
-- `spin()` context manager for scoped background loops
+- `spin()` unified interface (decorator, context manager, and manual control)
 - `@spin` decorator to easily loop sync or async functions
+- `spin` context manager for scoped background loops
 - `rate` / `RateControl` class for manual control
 - Adjustable frequency at runtime
 - Optional detailed performance reports
@@ -36,7 +37,7 @@ pip install -r requirements-dev.txt
 ## Library Cheatsheet
 A [comprehensive cheatsheet](fspin_cheatsheet.md) is available for developers and LLMs to quickly understand how to use the fspin library correctly. 
 The cheatsheet includes detailed API references, common use cases, best practices, and troubleshooting guidance. 
-Give this cheatsheet to your LLM, then it should be able to use and debug the library correctly.  
+The package also includes this cheatsheet in its docstrings.
 
 
 ## Usage
@@ -110,9 +111,12 @@ from fspin import spin
 
 counter = 0
 
+def my_work():
+    print("Beat")
+
 # Runs in background thread as long as counter < 5
 # condition_fn uses a lambda for concise state checking
-with spin(lambda: print("Beat"), freq=10, condition_fn=lambda: counter < 5) as rc:
+with spin(my_work, freq=10, condition_fn=lambda: counter < 5) as rc:
     while rc.is_running():
         counter += 1
         time.sleep(0.1)
