@@ -1,3 +1,5 @@
+from typing import List, Optional, Callable, Any, Union, Dict
+from concurrent.futures import Future
 import time
 import warnings
 import threading
@@ -29,6 +31,8 @@ class RateControl:
         is_coroutine (bool): Whether the target function is a coroutine.
         report (bool, optional): Enable performance reporting. Defaults to False.
         thread (bool, optional): Use threading for synchronous functions. Defaults to True.
+        max_exceptions (int, optional): Maximum number of recent exceptions to retain.
+            Defaults to 100. Use None to retain all exceptions.
 
     Raises:
         ValueError: If frequency is less than or equal to zero.
@@ -45,7 +49,8 @@ class RateControl:
         elapsed_time (float): Time elapsed since start in seconds.
         exception_count (int): Number of exceptions raised during execution.
     """
-    def __init__(self, freq, is_coroutine, report=False, thread=True):
+    def __init__(self, freq: float, is_coroutine: bool, report: bool = False, thread: bool = True,
+                 max_exceptions: Optional[int] = 100):
         """
         Initialize RateControl.
 
@@ -54,6 +59,8 @@ class RateControl:
             is_coroutine (bool): Whether the target function is a coroutine.
             report (bool, optional): Enables performance reporting if True. Defaults to False.
             thread (bool, optional): Use threading for synchronous functions if True. Defaults to True.
+            max_exceptions (int, optional): Maximum number of recent exceptions to retain.
+                Defaults to 100. Use None to retain all exceptions.
 
         Raises:
             ValueError: If frequency is less than or equal to zero.
@@ -61,12 +68,16 @@ class RateControl:
         self.loop_start_time = time.perf_counter()
         if freq <= 0:
             raise ValueError("Frequency must be greater than zero.")
+        if max_exceptions is not None and max_exceptions < 0:
+            raise ValueError("max_exceptions must be non-negative or None.")
         self._freq = freq
         self.loop_duration = 1.0 / freq  # Desired loop duration (seconds)
         self.is_coroutine = is_coroutine
         self.report = report
         self.thread = thread
         self.exceptions = []
+        self.max_exceptions = max_exceptions
+        self._exception_count = 0
         self._own_loop = None
 
         # Check if running async with high frequency based on OS
@@ -91,14 +102,39 @@ class RateControl:
                     category=RuntimeWarning,
                 )
 
+        self._task: Optional[asyncio.Task] = None
+        self._background_future: Optional[Future] = None
+        self._thread: Optional[threading.Thread] = None
+        self._loop_thread: Optional[threading.Thread] = None
+        self._state_lock = threading.Lock()
+        self._running = False
+
         if is_coroutine:
+            self._stop_event: Optional[Union[asyncio.Event, threading.Event]] = None
             try:
+                # We check for a running loop but don't set it yet
                 asyncio.get_running_loop()
             except RuntimeError:
                 lp = asyncio.new_event_loop()
-                asyncio.set_event_loop(lp)
                 self._own_loop = lp
-            self._stop_event = asyncio.Event()
+                
+                # Start the loop in a background thread
+                def run_loop(loop):
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_forever()
+                    finally:
+                        pending = asyncio.all_tasks(loop)
+                        for task in pending:
+                            task.cancel()
+                        if pending:
+                            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                        loop.close()
+                
+                self._loop_thread = threading.Thread(
+                    target=run_loop, args=(lp,), daemon=True, name="RateControlLoopThread"
+                )
+                self._loop_thread.start()
         else:
             self._stop_event = threading.Event()
         self._task = None
@@ -124,6 +160,14 @@ class RateControl:
 
         # Always maintain deviation accumulator for loop compensation.
         self.deviation_accumulator = 0.0
+
+    def __del__(self):
+        """Best-effort cleanup of background resources."""
+        try:
+            # We use a very short timeout for GC cleanup to avoid blocking the collector
+            self.stop_spinning(timeout=0.1)
+        except Exception:
+            pass
 
     def _prepare_condition_fn(self, condition_fn, *, is_async):
         """
@@ -191,11 +235,14 @@ class RateControl:
             func (callable): The function that raised the exception.
             is_coroutine (bool, optional): Whether the function is a coroutine. Defaults to False.
         """
-        self.exceptions.append(e)
+        self._exception_count += 1
+        if self.max_exceptions is None or self.max_exceptions > 0:
+            self.exceptions.append(e)
+            if self.max_exceptions is not None and len(self.exceptions) > self.max_exceptions:
+                del self.exceptions[:-self.max_exceptions]
         func_name = getattr(func, "__name__", "<anonymous>")
         func_type = "coroutine" if is_coroutine else "function"
         logger.exception(f"Exception in spinning {func_type} '%s'", func_name)
-        traceback.print_exc()
         warnings.warn(
             f"Exception in spinning {func_type} '{func_name}': {e}",
             category=RuntimeWarning,
@@ -241,7 +288,10 @@ class RateControl:
             total_loop_duration (float): The total duration of the loop iteration.
         """
         deviation = total_loop_duration - self.loop_duration
-        self.deviation_accumulator += deviation
+        self.deviation_accumulator = max(
+            -self.loop_duration,
+            min(self.deviation_accumulator + deviation, self.loop_duration),
+        )
 
         if self.report:
             self.deviations.append(deviation)
@@ -272,7 +322,13 @@ class RateControl:
         loop_start_time = self.start_time
         first_iteration = True
         try:
-            while not self._stop_event.is_set() and condition_fn():
+            while not self._stop_event.is_set():
+                try:
+                    if not condition_fn():
+                        break
+                except Exception as e:
+                    self._handle_exception(e, condition_fn)
+                    break
                 iteration_start = time.perf_counter()
                 try:
                     func(*args, **kwargs)
@@ -297,6 +353,7 @@ class RateControl:
             self.logger.output("KeyboardInterrupt received. Stopping spin.")
             self._stop_event.set()
         finally:
+            self._set_stopped()
             self._finalize_spin()
 
     async def spin_async(self, func, condition_fn, *args, **kwargs):
@@ -315,8 +372,30 @@ class RateControl:
         self.start_time = time.perf_counter()
         loop_start_time = self.start_time
         first_iteration = True
+
+        # Ensure stop_event is an asyncio.Event and bound to the current loop
+        if not isinstance(self._stop_event, asyncio.Event):
+            self._stop_event = asyncio.Event()
+        else:
+            # Check if event is bound to another loop
+            try:
+                if self._stop_event._loop != asyncio.get_running_loop():
+                    # Re-create to bind to current loop
+                    new_event = asyncio.Event()
+                    if self._stop_event.is_set():
+                        new_event.set()
+                    self._stop_event = new_event
+            except (AttributeError, RuntimeError):
+                pass
+
         try:
-            while not self._stop_event.is_set() and await condition_fn():
+            while not self._stop_event.is_set():
+                try:
+                    if not await condition_fn():
+                        break
+                except Exception as e:
+                    self._handle_exception(e, condition_fn, is_coroutine=True)
+                    break
                 iteration_start = time.perf_counter()
                 try:
                     await func(*args, **kwargs)
@@ -346,6 +425,7 @@ class RateControl:
             self._stop_event.set()
             raise
         finally:
+            self._set_stopped()
             self._finalize_spin()
 
     def start_spinning_sync(self, func, condition_fn, *args, **kwargs):
@@ -370,6 +450,8 @@ class RateControl:
 
         condition_fn = self._prepare_condition_fn(condition_fn, is_async=False)
 
+        with self._state_lock:
+            self._running = True
         if self.thread:
             self._thread = threading.Thread(
                 target=self.spin_sync, args=(func, condition_fn) + args, kwargs=kwargs)
@@ -400,8 +482,15 @@ class RateControl:
         """
         condition_fn = self._prepare_condition_fn(condition_fn, is_async=True)
 
+        with self._state_lock:
+            self._running = True
         self._task = asyncio.create_task(self.spin_async(func, condition_fn, *args, **kwargs))
+        self._task.add_done_callback(lambda _: self._set_stopped())
         return self._task
+
+    def _set_stopped(self) -> None:
+        with self._state_lock:
+            self._running = False
 
     async def start_spinning_async_wrapper(self, func, condition_fn=None, *, wait=False, **kwargs):
         """
@@ -429,7 +518,7 @@ class RateControl:
 
         return self if wait else task
 
-    def start_spinning(self, func, condition_fn, *args, **kwargs):
+    def start_spinning(self, func: Callable, condition_fn: Optional[Callable], *args: Any, **kwargs: Any) -> Optional[Union[threading.Thread, asyncio.Task, Future]]:
         """
         Starts the spinning process based on the mode.
 
@@ -442,37 +531,114 @@ class RateControl:
             **kwargs: Keyword arguments to pass to func.
 
         Returns:
-            threading.Thread, asyncio.Task, or None: The created thread or task, or None.
+            threading.Thread, asyncio.Task, concurrent.futures.Future, or None: The created
+                thread, task, cross-thread future, or None.
 
         Raises:
             TypeError: If the function type does not match the mode.
         """
         if self.is_coroutine:
             if not asyncio.iscoroutinefunction(func):
+                self.stop_spinning(timeout=0.1)
                 raise TypeError("Expected a coroutine function for async mode.")
-            return self.start_spinning_async(func, condition_fn, *args, **kwargs)
+            
+            if self._own_loop:
+                try:
+                    with self._state_lock:
+                        self._running = True
+                    prepared_condition = self._prepare_condition_fn(condition_fn, is_async=True)
+                    self._background_future = asyncio.run_coroutine_threadsafe(
+                        self.spin_async(func, prepared_condition, *args, **kwargs),
+                        self._own_loop
+                    )
+                    self._background_future.add_done_callback(self._background_spin_finished)
+                    return self._background_future # type: ignore
+                except Exception:
+                    self.stop_spinning(timeout=0.1)
+                    raise
+            else:
+                # Current loop
+                return self.start_spinning_async(func, condition_fn, *args, **kwargs) # type: ignore
         else:
             if asyncio.iscoroutinefunction(func):
+                self.stop_spinning(timeout=0.1)
                 raise TypeError("Expected a regular function for sync mode.")
-            return self.start_spinning_sync(func, condition_fn, *args, **kwargs)
+            try:
+                return self.start_spinning_sync(func, condition_fn, *args, **kwargs)
+            except Exception:
+                self.stop_spinning(timeout=0.1)
+                raise
 
-    def stop_spinning(self):
+    def _background_spin_finished(self, future: Future) -> None:
+        self._set_stopped()
+        if not future.cancelled() and self._own_loop is not None and not self._own_loop.is_closed():
+            try:
+                self._own_loop.call_soon_threadsafe(self._own_loop.stop)
+            except RuntimeError:
+                pass
+    def stop_spinning(self, timeout: Optional[float] = 1.0) -> bool:
         """
         Signals the spinning loop to stop.
+
+        Args:
+            timeout (float, optional): Maximum time to wait for a worker or owned-loop
+                thread to exit. Defaults to 1.0 seconds. Use None to wait indefinitely.
+
+        Returns:
+            bool: True if managed threads stopped before the timeout, otherwise False.
         """
-        self._stop_event.set()
+        with self._state_lock:
+            self._running = False
+        if self._stop_event is not None:
+            if self.is_coroutine:
+                if isinstance(self._stop_event, asyncio.Event):
+                    if self._own_loop is not None and not self._own_loop.is_closed():
+                        self._own_loop.call_soon_threadsafe(self._stop_event.set)
+                    else:
+                        # Best effort: we might be in the loop thread already, or loop is gone
+                        try:
+                            self._stop_event.set()
+                        except RuntimeError:
+                            pass
+                else:
+                    self._stop_event.set()
+            else:
+                self._stop_event.set()
+        
         if self.is_coroutine:
-            if self._task:
+            if self._background_future is not None:
+                self._background_future.cancel()
+            elif self._task:
                 self._task.cancel()
         else:
             if self._thread:
                 # Avoid deadlock if stop_spinning is called from within the worker thread
                 current = threading.current_thread()
                 if self._thread.is_alive() and current is not self._thread:
-                    self._thread.join()
+                    self._thread.join(timeout=timeout)
+                    if self._thread.is_alive():
+                        return False
+        
         if self._own_loop is not None:
-            self._own_loop.close()
+            loop = self._own_loop
+            loop_thread = self._loop_thread
+
+            if not loop.is_closed():
+                try:
+                    loop.call_soon_threadsafe(loop.stop)
+                except RuntimeError:
+                    pass
+
+            # Join the thread if we're not in it
+            current = threading.current_thread()
+            if loop_thread and loop_thread.is_alive() and current is not loop_thread:
+                loop_thread.join(timeout=timeout)
+                if loop_thread.is_alive():
+                    return False
+
             self._own_loop = None
+            self._loop_thread = None
+        return True
 
     def get_report(self, output=True):
         """
@@ -521,7 +687,8 @@ class RateControl:
         Returns:
             bool: True if the loop is running, False otherwise.
         """
-        return not self._stop_event.is_set()
+        with self._state_lock:
+            return self._running
 
     @property
     def elapsed_time(self):
@@ -589,7 +756,7 @@ class RateControl:
         Returns:
             int: Number of exceptions.
         """
-        return len(self.exceptions)
+        return self._exception_count
 
     def __str__(self):
         """

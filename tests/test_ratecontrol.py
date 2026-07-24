@@ -2,6 +2,7 @@ import asyncio
 import time
 import types
 import logging
+import threading
 import pytest
 import sys
 import os
@@ -11,6 +12,110 @@ from fspin.reporting import ReportLogger
 from fspin.rate_control import RateControl
 from fspin.decorators import spin
 from fspin.loop_context import loop
+
+
+def test_own_background_loop_reports_running_and_stops():
+    rc = RateControl(freq=10, is_coroutine=True)
+
+    async def work():
+        await asyncio.sleep(0.01)
+
+    future = rc.start_spinning(work, None)
+    assert future is not None
+    assert rc.is_running()
+
+    assert rc.stop_spinning(timeout=1.0)
+    assert not rc.is_running()
+    assert rc._own_loop is None
+    assert not any(thread.name == "RateControlLoopThread" for thread in threading.enumerate())
+
+
+def test_sync_condition_exception_is_recorded():
+    rc = RateControl(freq=1000, is_coroutine=False, thread=False)
+
+    def bad_condition():
+        raise ValueError("condition failed")
+
+    rc.start_spinning(lambda: None, bad_condition)
+
+    assert len(rc.exceptions) == 1
+    assert isinstance(rc.exceptions[0], ValueError)
+    assert not rc.is_running()
+
+
+@pytest.mark.asyncio
+async def test_async_condition_exception_is_recorded():
+    rc = RateControl(freq=1000, is_coroutine=True)
+
+    async def bad_condition():
+        raise ValueError("condition failed")
+
+    task = await rc.start_spinning_async(lambda: asyncio.sleep(0), bad_condition)
+    await task
+
+    assert len(rc.exceptions) == 1
+    assert isinstance(rc.exceptions[0], ValueError)
+    assert not rc.is_running()
+
+
+def test_stop_spinning_timeout_returns_false_for_blocked_worker():
+    rc = RateControl(freq=1000, is_coroutine=False, thread=True)
+    started = threading.Event()
+
+    def blocked_work():
+        started.set()
+        time.sleep(0.2)
+
+    worker = rc.start_spinning(blocked_work, None)
+    assert worker is not None
+    assert started.wait(timeout=1.0)
+
+    assert not rc.stop_spinning(timeout=0.01)
+    worker.join(timeout=1.0)
+
+
+def test_deviation_accumulator_is_bounded():
+    rc = RateControl(freq=10, is_coroutine=False)
+
+    rc._update_metrics(10.0)
+
+    assert rc.deviation_accumulator == rc.loop_duration
+
+
+def test_exception_retention_is_bounded_but_count_is_total():
+    rc = RateControl(freq=1000, is_coroutine=False, thread=False, max_exceptions=2)
+    calls = 0
+
+    def failing_work():
+        raise RuntimeError("failed")
+
+    def condition():
+        nonlocal calls
+        calls += 1
+        return calls <= 4
+
+    rc.start_spinning(failing_work, condition)
+
+    assert len(rc.exceptions) == 2
+    assert rc.exception_count == 4
+
+
+def test_exception_retention_can_be_unbounded():
+    rc = RateControl(freq=1000, is_coroutine=False, thread=False, max_exceptions=None)
+    calls = 0
+
+    def failing_work():
+        raise RuntimeError("failed")
+
+    def condition():
+        nonlocal calls
+        calls += 1
+        return calls <= 3
+
+    rc.start_spinning(failing_work, condition)
+
+    assert len(rc.exceptions) == 3
+    assert rc.exception_count == 3
 
 def test_create_histogram():
     logger = ReportLogger(enabled=True)
@@ -120,12 +225,8 @@ async def test_spin_async_counts():
 
     rc = await awork()
 
-    # Verify that the function was called at least once
-    assert len(calls) > 0, "Function was not called"
-
-    # If we didn't get exactly 2 calls, log a warning but don't fail the test
-    if len(calls) != 2:
-        print(f"Warning: Expected 2 calls, got {len(calls)}")
+    assert len(calls) == 2
+    assert rc.status == "stopped"
 
     assert rc.initial_duration is not None
     # We might not have exactly 1 iteration time, so just check that we have some
@@ -189,19 +290,8 @@ async def test_stop_spinning_async_task_cancel():
     rc.stop_spinning()
     await asyncio.sleep(0.05)
 
-    # Check if the task is done (it might be cancelled or completed)
-    assert rc._task.done(), "Task is not done after stop_spinning"
-
-    # If the task is not cancelled, it should have completed normally
-    if not rc._task.cancelled():
-        try:
-            # This should not raise an exception if the task completed normally
-            result = rc._task.result()
-            print(f"Task completed normally with result: {result}")
-        except Exception as e:
-            print(f"Task raised an exception: {e}")
-            # If the task raised an exception other than CancelledError, that's fine too
-            pass
+    assert rc._task.done()
+    assert rc._task.cancelled()
 
 
 @pytest.mark.asyncio
@@ -238,11 +328,21 @@ async def test_spin_async_exception_handling(caplog):
     assert exception_logged, "Exception was not logged"
 
 
-def test_generate_report_no_iterations(caplog):
+def test_generate_report_no_iterations(caplog, capsys):
     rc = RateControl(freq=10, is_coroutine=False, report=True, thread=False)
-    with caplog.at_level(logging.INFO):
+    # Clear handlers and setup a fresh one for the test
+    from fspin import reporting
+    reporting.logger.handlers = []
+    reporting._setup_terminal_logging()
+    
+    with caplog.at_level(logging.INFO, logger='fspin.reporting'):
         rc.get_report()
-    assert any("No iterations were recorded" in r.getMessage() for r in caplog.records)
+    
+    # Check both logger and possibly captured stdout
+    msg = "No iterations were recorded"
+    logged = any(msg in r.getMessage() for r in caplog.records)
+    captured = capsys.readouterr().out
+    assert logged or msg in captured
 
 def test_loop_context_manager_basic_counts():
     import time
@@ -300,8 +400,13 @@ def test_exception_tracking_and_report():
     rc.start_spinning(work, condition)
     report = rc.get_report(output=False)
     assert rc.exception_count == 1
+    assert report["frequency"] == 1000
+    assert report["total_iterations"] == 2
     assert report["exception_count"] == 1
+    assert len(report["exceptions"]) == 1
     assert isinstance(report["exceptions"][0], RuntimeError)
+    assert report["avg_frequency"] > 0
+    assert report["avg_loop_duration"] > 0
 
 
 def test_str_and_repr_contain_info():
@@ -373,16 +478,7 @@ async def test_automatic_report_generation_async():
     rc = RateControl(freq=100, is_coroutine=True, report=True)
     await rc.start_spinning_async_wrapper(awork, condition, wait=True)
 
-    # Verify that the function was called at least once
-    assert len(calls) > 0, "Function was not called"
-
-    # If we didn't get exactly 2 calls, log a warning but don't fail the test
-    if len(calls) != 2:
-        print(f"Warning: Expected 2 calls, got {len(calls)}")
-
-    # Explicitly generate the report if it wasn't generated automatically
-    if not rc.logger.report_generated:
-        rc.get_report()
+    assert len(calls) == 2
 
     assert rc.logger.report_generated, "Report was not generated"
     assert rc.mode == "async", "Incorrect mode detected"
@@ -556,28 +652,24 @@ def test_report_logger_with_disabled_output():
 def test_rate_control_with_own_loop():
     """Test RateControl creating its own event loop."""
     # Save the current event loop
+    rc = None
     try:
         old_loop = asyncio.get_event_loop()
     except RuntimeError:
         # No event loop in this thread
         old_loop = None
 
-    # Close any existing event loop
-    if old_loop and not old_loop.is_closed():
-        old_loop.close()
-
-    # Create RateControl with is_coroutine=True, which should create its own loop
-    rc = RateControl(freq=100, is_coroutine=True)
-
-    # Verify the loop was created
-    assert rc._own_loop is not None, "RateControl should create its own event loop"
-
-    # Clean up
-    rc.stop_spinning()
-
-    # Restore the event loop if needed
-    if old_loop and not old_loop.is_closed():
-        asyncio.set_event_loop(old_loop)
+    try:
+        # With no running loop in this thread, RateControl should create and
+        # own a loop in its background thread.
+        asyncio.set_event_loop(None)
+        rc = RateControl(freq=100, is_coroutine=True)
+        assert rc._own_loop is not None, "RateControl should create its own event loop"
+    finally:
+        if rc is not None:
+            rc.stop_spinning()
+        if old_loop is not None and not old_loop.is_closed():
+            asyncio.set_event_loop(old_loop)
 
 @pytest.mark.asyncio
 async def test_async_spin_with_cancelled_error():

@@ -5,13 +5,23 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 def _setup_terminal_logging():
-    root_logger = logging.getLogger()
-    if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.INFO)
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        root_logger.addHandler(handler)
-        root_logger.setLevel(logging.INFO)
+    # If our logger already has real handlers, don't add more
+    if any(not isinstance(h, logging.NullHandler) for h in logger.handlers):
+        return
+
+    # If the root logger already has handlers, we don't necessarily need to add one,
+    # but the user might want library-specific output.
+    # For now, if root has handlers, we'll assume the user has a logging setup.
+    if logging.getLogger().handlers:
+        return
+
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    # Don't propagate to root to avoid double logging if root also has a StreamHandler
+    logger.propagate = False
 
 class ReportLogger:
     """Holds all logging/reporting related functions and data formatting."""
@@ -23,8 +33,10 @@ class ReportLogger:
 
     def output(self, msg: str):
         if self.enabled:
-            logger.info(msg)
-            print(msg)
+            if logger.hasHandlers() and not any(isinstance(h, logging.NullHandler) for h in logger.handlers if len(logger.handlers) == 1):
+                logger.info(msg)
+            else:
+                print(msg)
 
     def create_histogram(self, data, bins=10, bar_width=50):
         if not data:
